@@ -1,0 +1,107 @@
+<#
+.SYNOPSIS
+Hook that runs once per subscription before any deploy-lab.ps1 run starts.
+.DESCRIPTION
+Hook that runs before the per-user deploy-lab.ps1 runs are started. It can be used to deploy shared resources on a subscription level
+(e.g. a hub VNet) or to prepare the subscription once instead of once per lab (e.g. registering resource providers).
+If it fails for any subscription, no deploy-lab.ps1 runs at all. Emitted HackboxCredential entries are stored for every lab in this subscription.
+.PARAMETER SubscriptionId
+Specifies the Azure subscription that contains the lab resources.
+.PARAMETER PreferredLocation
+Specifies the preferred Azure regions (ordered by preference) for resource deployment.
+.PARAMETER AllowedEntraUserIds
+Entra user object IDs of every participant holding a lab in this subscription.
+#>
+param(  
+    [Parameter(Mandatory=$true)]
+    [string]$SubscriptionId,
+
+    [Parameter(Mandatory=$true)]
+    [string[]]$PreferredLocation = @(),
+
+    [Parameter(Mandatory=$false)]
+    [string[]]$AllowedEntraUserIds = @()
+)
+
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Write-Host "[$SubscriptionId] Running shared-deploy-lab.ps1 in $scriptPath"
+
+# EXAMPLE: Register Resource Providers here if needed
+$requiredProviders = @(
+    "Microsoft.Compute",
+    "Microsoft.Network",
+    "Microsoft.Storage",
+    "Microsoft.Sql",
+    "Microsoft.SqlVirtualMachine",
+    "Microsoft.DevTestLab"
+)
+foreach($provider in $requiredProviders) {
+    $state = (Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue | Select-Object -First 1).RegistrationState
+    if($state -ne "Registered") {
+        Write-Host "[$SubscriptionId] Registering resource provider: $provider"
+        Register-AzResourceProvider -ProviderNamespace $provider -ErrorAction Stop
+    }
+    else {
+        Write-Host "[$SubscriptionId] Resource provider $provider is already registered."
+    }
+}
+
+# EXAMPLE: shared resources, e.g. hub networks, bastion host, etc. can be deployed here...
+# no resource group is pre-created for this hook, so pick your own name and never use a participant's resource group
+$environmentName = "sqlhack"  # template produces rg-sqlhack-shared
+$sharedResourceGroup = "rg-${environmentName}-shared"
+$adminUsername = "DemoUser"
+$adminPassword = "Demo@pass1234567"
+$sqlMiAdminUsername = "DemoUser"
+$sqlMiAdminPassword = "Demo@pass1234567"
+$legacySQLName = "legacySQL2016"
+$arcSQLName = "arcSQL2022"
+
+
+# deploy shared resources in the shared resource group (do not forget to assign the correct rbac roles to the allowed Entra users)
+# Invoke-MhhDeploymentWithRegionFallback creates/recreates the resource group, re-grants Owner and falls back to the next region
+
+# $template = Join-Path $scriptPath "template-shared.bicep"
+$templatePath = Join-Path $scriptPath "infra"
+$template = Join-Path $templatePath "main-shared.bicep"
+Write-Host "[$SubscriptionId] Deploying shared resources from template $template to resource group $sharedResourceGroup"
+
+Write-Host $AllowedEntraUserIds
+
+New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -Force -ErrorAction Stop
+
+#$result = Invoke-MhhDeploymentWithRegionFallback `
+#    -PreferredLocations      $PreferredLocation `
+#    -TemplateFile            $template #`
+#    -TemplateParameterObject @{
+#        userIds = $AllowedEntraUserIds
+#    }
+
+$result = Invoke-MhhDeploymentWithRegionFallback `
+    -PreferredLocations      $PreferredLocation `
+    -RgOwnerEntraObjectIds   $AllowedEntraUserIds `
+    -ResourceGroupName       $sharedResourceGroup `
+    -TemplateFile            $template `
+    -TemplateParameterObject @{
+        environmentName      = $environmentName  # z.B. "sqlhack"
+        location            = $PreferredLocation[0]
+        adminUsername       = $adminUsername
+        adminPassword       = $adminPassword
+        sqlMiAdminUsername  = $sqlMiAdminUsername
+        sqlMiAdminPassword  = $sqlMiAdminPassword
+        legacySQLName       = $legacySQLName
+        arcSQLName          = $arcSQLName
+        labCount            = 8
+    }
+
+Write-Host "[$SubscriptionId] Result: $($result)"
+
+# You can send back information to the hackbox console (credentials) - Simply return a hashtable like this:
+# Note: everything returned here is shown to EVERY participant in this subscription, so never emit per-participant secrets.
+# @{"HackboxCredential" = @{ name = "AdminPassword" ; value = "TopSecret"; note = "Useful info here" }}
+
+$managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+
+@{ HackboxCredential = @{ name = $adminUsername; value = $adminPassword; note = $legacySQLName } }
+@{ HackboxCredential = @{ name = $adminUsername; value = $adminPassword; note = $arcSQLName } }
+@{ HackboxCredential = @{ name = $sqlMiAdminUsername; value = $sqlMiAdminPassword; note = $managedInstanceFQDN } }
