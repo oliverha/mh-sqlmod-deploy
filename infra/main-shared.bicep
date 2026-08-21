@@ -7,7 +7,7 @@ param environmentName string
 param location string
 
 param adminUsername string
-param reproBaseURL string = 'https://raw.githubusercontent.com/OliverUweHahn/azd-sql-microhack/main'
+param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main'
 
 @secure()
 param adminPassword string
@@ -177,7 +177,7 @@ module legacySqlVm_cse 'modules/sql2016-vm-cse.bicep' = {
     adminPassword: adminPassword
     storageAccountName: storageAccountName
     managedInstanceServer: managedInstance.outputs.fullyQualifiedDomainName
-    reproBaseURL: reproBaseURL
+    repoBaseURL: repoBaseURL
   }
 }
 
@@ -192,7 +192,7 @@ module sqlarcSqlVm_cse 'modules/sql2022-vm-cse.bicep' = {
     vmName: 'arcSQL2022'
     adminUsername: adminUsername
     adminPassword: adminPassword
-    reproBaseURL: reproBaseURL
+    repoBaseURL: repoBaseURL
   }
 }
 

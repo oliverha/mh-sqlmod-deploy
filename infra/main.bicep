@@ -9,7 +9,7 @@ param vmName string
 @description('Name of the shared resource group for accessing shared resources')
 param sharedResourceGroupName string = ''
 
-param reproBaseURL string = 'https://raw.githubusercontent.com/OliverUweHahn/azd-sql-microhack/main'
+param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main'
 
 param storageAccountName string
 //param managedInstanceName string
@@ -59,7 +59,7 @@ module teamVms_cse 'modules/team-vm-cse.bicep' = {
   params: {
     location: location
     vmName: vmName
-    reproBaseURL: reproBaseURL
+    repoBaseURL: repoBaseURL
     managedInstanceServer: managedInstanceFQDN
     storageAccountName: storageAccountName
   }

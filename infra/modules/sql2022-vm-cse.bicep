@@ -1,7 +1,7 @@
 param location string
 param vmName string
 param adminUsername string
-param reproBaseURL string
+param repoBaseURL string
 
 @secure()
 param adminPassword string
@@ -32,9 +32,9 @@ resource ConfigureSQLMachine 'Microsoft.Compute/virtualMachines/extensions@2024-
 
     settings: {
       fileUris: [
-        '${reproBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
-        '${reproBaseURL}/scripts/Restore-SampleDatabases.ps1'
-        '${reproBaseURL}/scripts/bootstrap-newsql.ps1'
+        '${repoBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
+        '${repoBaseURL}/scripts/Restore-SampleDatabases.ps1'
+        '${repoBaseURL}/scripts/bootstrap-newsql.ps1'
       ]
     }
 
