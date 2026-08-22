@@ -7,7 +7,7 @@ param environmentName string
 param location string
 
 param adminUsername string
-param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main/03-Azure/01-02%20Data/02-SQL_Modernization/labautomation'
+param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main/labautomation'
 
 @secure()
 param adminPassword string
