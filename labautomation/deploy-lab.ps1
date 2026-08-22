@@ -35,7 +35,7 @@ Write-Host "[$SubscriptionId] Running deploy-lab.ps1 in $scriptPath"
 # Lab environment configuration
 $environmentName = "sqlhack"
 $sharedResourceGroupName = "rg-sqlhack-shared"
-$resourceGroupName = "rg-sqlhack"
+#$resourceGroupName = "rg-sqlhack"
 $adminUsername = "DemoUser"
 $adminPassword = "Demo@pass1234567"
 
@@ -120,7 +120,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
     }
 
 Write-Host "[$SubscriptionId] Lab deployment completed successfully"
-Write-Host "[$SubscriptionId] Lab Resource Group: rg-$environmentName"
+Write-Host "[$SubscriptionId] Lab Resource Group: $effectiveResourceGroup"
 Write-Host "[$SubscriptionId] Shared Resource Group: $sharedResourceGroupName"
 Write-Host "[$SubscriptionId] Result: $($result)"
 
