@@ -74,8 +74,6 @@ else {
     }
     $effectiveResourceGroup = $ResourceGroupName
 }
-# feed the effective resource group back to the console
-@{"HackboxCredential" = @{ name = "ResourceGroupName" ; value = $effectiveResourceGroup; note = "The name of the resource group where lab resources are deployed" }}
 
 Write-Host "[$SubscriptionId] Deploying to user: $($AllowedEntraUserIds[0])"
 
@@ -125,3 +123,6 @@ Write-Host "[$SubscriptionId] Lab deployment completed successfully"
 Write-Host "[$SubscriptionId] Lab Resource Group: rg-$environmentName"
 Write-Host "[$SubscriptionId] Shared Resource Group: $sharedResourceGroupName"
 Write-Host "[$SubscriptionId] Result: $($result)"
+
+# feed the effective resource group back to the console
+@{"HackboxCredential" = @{ name = "ResourceGroupName" ; value = $effectiveResourceGroup; note = "The name of the resource group where lab resources are deployed" }}

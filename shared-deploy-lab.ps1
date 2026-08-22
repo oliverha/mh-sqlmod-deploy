@@ -91,7 +91,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
     -RgOwnerEntraObjectIds   @($AllowedEntraUserIds) `
     -ResourceGroupName       $sharedResourceGroup `
     -TemplateFile            $template `
-    -Tags                    $tags `
+    -Tag                     $tags `
     -TemplateParameterObject @{
         environmentName      = $environmentName  # z.B. "sqlhack"
         location            = $PreferredLocation[0]
@@ -112,13 +112,42 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
-$SQLMIEntraAdmin = Get-AzADUser -id @($AllowedEntraUserIds)[0]
+$SQLMIEntraAdmin = Get-AzADUser -ObjectID @($AllowedEntraUserIds)[0]
 
 Write-Host "Setting EntraID Admin of $managedInstanceFQDN to $($SQLMIEntraAdmin.UserPrincipalName)"
 try {
-    Set-AzSqlInstanceActiveDirectoryAdministrator -ResourceGroupName $sharedResourceGroup -InstanceName $managedInstance.ManagedInstanceName -DisplayName $SQLMIEntraAdmin.DisplayName -ObjectId $SQLMIEntraAdmin.Id
+    Connect-MgGraph -Scopes "RoleManagement.ReadWrite.Directory" -NoWelcome -erroraction Stop
+    $MIName = $managedInstance.ManagedInstanceName
+    # Find MI service principal
+    $miSp = Get-MgServicePrincipal -Filter "displayName eq '$MIName'"
+    # Find Directory Readers role
+    $role = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
+    # Assign role
+    New-MgDirectoryRoleMemberByRef -DirectoryRoleId $role.Id -BodyParameter @{
+        "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($miSp.Id)"
+    }
 }
 catch {
+    Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
+}
+
+$bSuccess = $false
+$maxAttempts = 20
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    try {
+        Set-AzSqlInstanceActiveDirectoryAdministrator -ResourceGroupName $sharedResourceGroup -InstanceName $managedInstance.ManagedInstanceName -DisplayName $SQLMIEntraAdmin.DisplayName -ObjectId $SQLMIEntraAdmin.Id -ErrorAction Stop
+        Write-Host "Entra Admin configured successfully."
+        $bSuccess = $rue
+        break        
+    }
+    catch {
+        if ($attempt -ne $maxAttempts) {
+            Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN... (retrying)" -ForegroundColor Yellow
+        }
+        Start-Sleep -Seconds 10
+    }
+}
+if ($bSuccess -eq $false) {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
 }
 
