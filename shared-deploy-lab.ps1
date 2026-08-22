@@ -68,8 +68,17 @@ Write-Host "[$SubscriptionId] Deploying shared resources from template $template
 
 Write-Host $AllowedEntraUserIds
 
+$LabUsers = @(Get-MhhLabUser -UserId @($AllowedEntraUserIds)) | Where-Object { $_.ShortName -like "labuser-*" }
+$LabCount = $LabUsers.Count
+if ($LabCount -eq 0) {
+    $LabCount = 1
+}
+
 New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -Force -ErrorAction Stop
 
+$tags = @{
+    SecurityControl = "Ignore"
+}
 #$result = Invoke-MhhDeploymentWithRegionFallback `
 #    -PreferredLocations      $PreferredLocation `
 #    -TemplateFile            $template #`
@@ -79,9 +88,10 @@ New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -
 
 $result = Invoke-MhhDeploymentWithRegionFallback `
     -PreferredLocations      $PreferredLocation `
-    -RgOwnerEntraObjectIds   $AllowedEntraUserIds `
+    -RgOwnerEntraObjectIds   @($AllowedEntraUserIds) `
     -ResourceGroupName       $sharedResourceGroup `
     -TemplateFile            $template `
+    -Tags                    $tags `
     -TemplateParameterObject @{
         environmentName      = $environmentName  # z.B. "sqlhack"
         location            = $PreferredLocation[0]
@@ -91,7 +101,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         sqlMiAdminPassword  = $sqlMiAdminPassword
         legacySQLName       = $legacySQLName
         arcSQLName          = $arcSQLName
-        labCount            = 8
+        labCount            = $LabCount
     }
 
 Write-Host "[$SubscriptionId] Result: $($result)"
@@ -100,7 +110,17 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 # Note: everything returned here is shown to EVERY participant in this subscription, so never emit per-participant secrets.
 # @{"HackboxCredential" = @{ name = "AdminPassword" ; value = "TopSecret"; note = "Useful info here" }}
 
-$managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+$managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
+$managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+$SQLMIEntraAdmin = Get-AzADUser -id @($AllowedEntraUserIds)[0]
+
+Write-Host "Setting EntraID Admin of $managedInstanceFQDN to $($SQLMIEntraAdmin.UserPrincipalName)"
+try {
+    Set-AzSqlInstanceActiveDirectoryAdministrator -ResourceGroupName $sharedResourceGroup -InstanceName $managedInstance.ManagedInstanceName -DisplayName $SQLMIEntraAdmin.DisplayName -ObjectId $SQLMIEntraAdmin.Id
+}
+catch {
+    Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
+}
 
 @{ HackboxCredential = @{ name = $adminUsername; value = $adminPassword; note = $legacySQLName } }
 @{ HackboxCredential = @{ name = $adminUsername; value = $adminPassword; note = $arcSQLName } }
