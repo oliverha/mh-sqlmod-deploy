@@ -46,6 +46,16 @@ foreach($provider in $requiredProviders) {
     }
 }
 
+try {
+    $registrationState = Get-AzProviderFeature -ProviderNamespace Microsoft.Network -FeatureName AllowBringYourOwnPublicIpAddress
+    If ($registrationState.RegistrationState -ne "Registered") {
+        Register-AzProviderFeature -ProviderNamespace Microsoft.Network -FeatureName AllowBringYourOwnPublicIpAddress
+    }
+}
+catch {
+    Write-Host "Could not register AllowBringYourOwnPublicIpAddress." -ForegroundColor Red
+}
+
 # EXAMPLE: shared resources, e.g. hub networks, bastion host, etc. can be deployed here...
 # no resource group is pre-created for this hook, so pick your own name and never use a participant's resource group
 $environmentName = "sqlhack"  # template produces rg-sqlhack-shared
