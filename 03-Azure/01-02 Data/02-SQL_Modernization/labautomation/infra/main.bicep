@@ -10,7 +10,7 @@ param TeamNumber int = 1
 @description('Name of the shared resource group for accessing shared resources')
 param sharedResourceGroupName string = ''
 
-param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main'
+param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main/03-Azure/01-02%20Data/02-SQL_Modernization/labautomation'
 
 param storageAccountName string
 //param managedInstanceName string
