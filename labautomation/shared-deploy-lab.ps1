@@ -84,6 +84,8 @@ if ($LabCount -eq 0) {
     $LabCount = 1
 }
 
+$SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
+
 New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -Force -ErrorAction Stop
 
 $tags = @{
@@ -103,15 +105,17 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
     -TemplateFile            $template `
     -Tag                     $tags `
     -TemplateParameterObject @{
-        environmentName      = $environmentName  # z.B. "sqlhack"
-        location            = $PreferredLocation[0]
-        adminUsername       = $adminUsername
-        adminPassword       = $adminPassword
-        sqlMiAdminUsername  = $sqlMiAdminUsername
-        sqlMiAdminPassword  = $sqlMiAdminPassword
-        legacySQLName       = $legacySQLName
-        arcSQLName          = $arcSQLName
-        labCount            = $LabCount
+        environmentName                     = $environmentName  # z.B. "sqlhack"
+        location                            = $PreferredLocation[0]
+        adminUsername                       = $adminUsername
+        adminPassword                       = $adminPassword
+        sqlMiAdminUsername                  = $sqlMiAdminUsername
+        sqlMiAdminPassword                  = $sqlMiAdminPassword
+        ManagedInstanceEntraAdminObjectId   = $SQLMiEntraAdmin.Id
+        ManagedInstanceEntraAdminName       = $SQLMiEntraAdmin.DisplayName
+        legacySQLName                       = $legacySQLName
+        arcSQLName                          = $arcSQLName
+        labCount                            = $LabCount
     }
 
 Write-Host "[$SubscriptionId] Result: $($result)"

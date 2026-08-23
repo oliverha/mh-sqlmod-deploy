@@ -6,6 +6,9 @@ param administratorLogin string
 @secure()
 param administratorLoginPassword string
 
+param ManagedInstanceEntraAdminObjectId string
+param ManagedInstanceEntraAdminName string
+
 @allowed([
   4
   8
@@ -57,6 +60,18 @@ resource managedInstance 'Microsoft.Sql/managedInstances@2025-02-01-preview' = {
     minimalTlsVersion: '1.2'
     requestedBackupStorageRedundancy: 'Local'
     timezoneId: 'UTC'
+  }
+}
+
+resource entraAdmin 'Microsoft.Sql/managedInstances/administrators@2025-02-01-preview' = {
+  parent: managedInstance
+  name: 'ActiveDirectory'
+
+  properties: {
+    administratorType: 'ActiveDirectory'
+    login: ManagedInstanceEntraAdminName
+    sid: ManagedInstanceEntraAdminObjectId
+    tenantId: subscription().tenantId
   }
 }
 
