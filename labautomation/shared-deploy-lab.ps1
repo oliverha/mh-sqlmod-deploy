@@ -123,39 +123,9 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
 
-$miPrincipalId = $managedInstance.Identity.PrincipalId
-
-# Directory Readers Rolle finden
-$roleDirectoryReaders = Get-AzureADDirectoryRole | Where-Object {
-    $_.DisplayName -eq "Directory Readers"
-}
-
-# Falls die Rolle im Tenant noch nicht aktiviert wurde
-if (-not $roleDirectoryReaders) {
-    throw "Directory Readers role is not activated in this tenant."
-}
-
-# MI Identity hinzufügen
-Add-AzureADDirectoryRoleMember `
-    -ObjectId $roleDirectoryReaders.ObjectId `
-    -RefObjectId $miPrincipalId
-
-# Replikation abwarten
-Start-Sleep -Seconds 120
-
-$SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
-# Entra Admin auf der MI setzen
-Set-AzSqlInstanceActiveDirectoryAdministrator `
-    -ResourceGroupName $ResourceGroupName `
-    -InstanceName $ManagedInstanceName `
-    -DisplayName $SQLMiEntraAdmin.DisplayName `
-    -ObjectId $SQLMiEntraAdmin.Id
-
-<# 
-$SQLMIEntraAdmin = Get-AzADUser -ObjectID @($AllowedEntraUserIds)[0]
-Write-Host "Granting Read Directory to SQLMI System Managed Identity $MIName."
 try {
-    Connect-MgGraph -Scopes "RoleManagement.ReadWrite.Directory" -NoWelcome -erroraction Stop
+    $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
+    Connect-MgGraph -AccessToken $token -NoWelcome -erroraction Stop
     $MIName = $managedInstance.ManagedInstanceName
     # Find MI service principal
     $miSp = Get-MgServicePrincipal -Filter "displayName eq '$MIName'"
@@ -171,28 +141,23 @@ catch {
     Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
 }
 
-Write-Host "Setting EntraID Admin of $managedInstanceFQDN to $($SQLMIEntraAdmin.UserPrincipalName)"
-$bSuccess = $false
-$maxAttempts = 20
-for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-    try {
-        Set-AzSqlInstanceActiveDirectoryAdministrator -ResourceGroupName $sharedResourceGroup -InstanceName $managedInstance.ManagedInstanceName -DisplayName $SQLMIEntraAdmin.DisplayName -ObjectId $SQLMIEntraAdmin.Id -ErrorAction Stop
-        Write-Host "Entra Admin configured successfully."
-        $bSuccess = $rue
-        break        
-    }
-    catch {
-        if ($attempt -ne $maxAttempts) {
-            Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN... (retrying)" -ForegroundColor Yellow
-            Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
-        }
-        Start-Sleep -Seconds 10
-    }
+
+# Replikation abwarten
+Start-Sleep -Seconds 120
+
+try {
+    $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
+    # Entra Admin auf der MI setzen
+    Set-AzSqlInstanceActiveDirectoryAdministrator `
+        -ResourceGroupName $sharedResourceGroup `
+        -InstanceName $managedInstance.ManagedInstanceName `
+        -DisplayName $SQLMiEntraAdmin.DisplayName `
+        -ObjectId $SQLMiEntraAdmin.Id
 }
-if ($bSuccess -eq $false) {
+catch {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
+    Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
 }
-#>
 
 @{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'}}
 @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'}}
