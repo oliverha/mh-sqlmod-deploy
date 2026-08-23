@@ -122,8 +122,9 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
-$SQLMIEntraAdmin = Get-AzADUser -ObjectID @($AllowedEntraUserIds)[0]
 
+<# 
+$SQLMIEntraAdmin = Get-AzADUser -ObjectID @($AllowedEntraUserIds)[0]
 Write-Host "Granting Read Directory to SQLMI System Managed Identity $MIName."
 try {
     Connect-MgGraph -Scopes "RoleManagement.ReadWrite.Directory" -NoWelcome -erroraction Stop
@@ -163,6 +164,7 @@ for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
 if ($bSuccess -eq $false) {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
 }
+#>
 
 @{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'}}
 @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'}}
