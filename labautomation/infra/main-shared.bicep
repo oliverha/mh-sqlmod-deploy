@@ -32,9 +32,6 @@ param labCount int = 8
 param legacyVmSize string = 'Standard_D4s_v5'
 param sqlarcVmSize string = 'Standard_D2s_v5'
 
-param ManagedInstanceEntraAdminObjectId string
-param ManagedInstanceEntraAdminName string
-
 param managedInstanceVCores int = 8
 param managedInstanceStorageGB int = 256
 
@@ -135,8 +132,6 @@ module managedInstance 'modules/managed-instance.bicep' = {
     subnetId: network.outputs.managedInstanceSubnetId
     administratorLogin: sqlMiAdminUsername
     administratorLoginPassword: sqlMiAdminPassword
-    ManagedInstanceEntraAdminObjectId: ManagedInstanceEntraAdminObjectId
-    ManagedInstanceEntraAdminName: ManagedInstanceEntraAdminName
     vCores: managedInstanceVCores
     storageSizeInGB: managedInstanceStorageGB
     tags: tags

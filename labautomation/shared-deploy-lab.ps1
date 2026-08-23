@@ -84,8 +84,6 @@ if ($LabCount -eq 0) {
     $LabCount = 1
 }
 
-$SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
-
 New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -Force -ErrorAction Stop
 
 $tags = @{
@@ -111,8 +109,6 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         adminPassword                       = $adminPassword
         sqlMiAdminUsername                  = $sqlMiAdminUsername
         sqlMiAdminPassword                  = $sqlMiAdminPassword
-        ManagedInstanceEntraAdminObjectId   = $SQLMiEntraAdmin.Id
-        ManagedInstanceEntraAdminName       = $SQLMiEntraAdmin.DisplayName
         legacySQLName                       = $legacySQLName
         arcSQLName                          = $arcSQLName
         labCount                            = $LabCount
@@ -126,6 +122,34 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+
+$miPrincipalId = $managedInstance.Identity.PrincipalId
+
+# Directory Readers Rolle finden
+$roleDirectoryReaders = Get-AzureADDirectoryRole | Where-Object {
+    $_.DisplayName -eq "Directory Readers"
+}
+
+# Falls die Rolle im Tenant noch nicht aktiviert wurde
+if (-not $roleDirectoryReaders) {
+    throw "Directory Readers role is not activated in this tenant."
+}
+
+# MI Identity hinzufügen
+Add-AzureADDirectoryRoleMember `
+    -ObjectId $roleDirectoryReaders.ObjectId `
+    -RefObjectId $miPrincipalId
+
+# Replikation abwarten
+Start-Sleep -Seconds 120
+
+$SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
+# Entra Admin auf der MI setzen
+Set-AzSqlInstanceActiveDirectoryAdministrator `
+    -ResourceGroupName $ResourceGroupName `
+    -InstanceName $ManagedInstanceName `
+    -DisplayName $SQLMiEntraAdmin.DisplayName `
+    -ObjectId $SQLMiEntraAdmin.Id
 
 <# 
 $SQLMIEntraAdmin = Get-AzADUser -ObjectID @($AllowedEntraUserIds)[0]
