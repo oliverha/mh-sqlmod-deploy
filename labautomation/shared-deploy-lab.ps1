@@ -125,34 +125,33 @@ $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup
 
 try {
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
-    Connect-MgGraph -AccessToken $token -NoWelcome -erroraction Stop
+    Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     $MIName = $managedInstance.ManagedInstanceName
     # Find MI service principal
-    $miSp = Get-MgServicePrincipal -Filter "displayName eq '$MIName'"
+    $miSp = Get-MgServicePrincipal -Filter "displayName eq '$MIName'" -ErrorAction Stop
     # Find Directory Readers role
-    $role = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
+    $roleDirectoryReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"} -ErrorAction Stop
     # Assign role
-    New-MgDirectoryRoleMemberByRef -DirectoryRoleId $role.Id -BodyParameter @{
+    New-MgDirectoryRoleMemberByRef -DirectoryRoleId $roleDirectoryReaders.Id -BodyParameter @{
         "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($miSp.Id)"
-    }
+    } -ErrorAction Stop
 }
 catch {
-    Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
+    Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
     Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
 }
-
 
 # Replikation abwarten
 Start-Sleep -Seconds 120
 
 try {
-    $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0]
+    $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
     # Entra Admin auf der MI setzen
     Set-AzSqlInstanceActiveDirectoryAdministrator `
         -ResourceGroupName $sharedResourceGroup `
         -InstanceName $managedInstance.ManagedInstanceName `
         -DisplayName $SQLMiEntraAdmin.DisplayName `
-        -ObjectId $SQLMiEntraAdmin.Id
+        -ObjectId $SQLMiEntraAdmin.Id -ErrorAction Stop
 }
 catch {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
