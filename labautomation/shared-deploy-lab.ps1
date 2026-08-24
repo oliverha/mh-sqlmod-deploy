@@ -157,7 +157,7 @@ Start-Sleep -Seconds 30
 try {
     $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
     # Entra Admin auf der MI setzen
-    Set-AzSqlInstanceActiveDirectoryAdministrator `
+    $return = Set-AzSqlInstanceActiveDirectoryAdministrator `
         -ResourceGroupName $sharedResourceGroup `
         -InstanceName $managedInstance.ManagedInstanceName `
         -DisplayName $SQLMiEntraAdmin.DisplayName `
