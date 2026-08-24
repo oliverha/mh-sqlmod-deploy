@@ -124,6 +124,8 @@ $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -Er
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
 
 try {
+    $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
+    Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     $managedInstance.Id | Set-MhhManagedIdentityRoleMember -Role = @('Directory Readers')
 }
 catch {
