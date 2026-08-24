@@ -23,19 +23,21 @@ resource bastion 'Microsoft.Network/bastionHosts@2024-05-01' = {
   location: location
   tags: tags
 
-  // sku: {
-  //   name: 'Basic'
-  // }
- 
   sku: {
-    name: 'Standard'
+    name: 'Basic'
   }
+ 
+  // sku: {
+  //  name: 'Standard'
+  // }
 
   properties: {
     // Enables Native Client connections (SSH/RDP via Azure CLI)
-    enableTunneling: true 
+    //enableTunneling: true 
+    enableTunneling: false
     // Enables the creation of browser-accessible Shareable Links
-    enableShareableLink: true 
+    //enableShareableLink: true 
+    enableShareableLink: false
     
     ipConfigurations: [
       {
