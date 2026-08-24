@@ -129,7 +129,7 @@ try {
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
-    $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId -Role = @('Directory Readers')
+    $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId
 }
 catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
