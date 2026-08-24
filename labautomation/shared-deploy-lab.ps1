@@ -122,13 +122,14 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+[string]$managedInstanceResourceId = $managedInstance.Id
 
 try {
     Write-Host "Connecting to MGraph..."
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     Write-Host "Calling Set-MhhManagedIdentityRoleMember..."
-    $return = Set-MhhManagedIdentityRoleMember -ResourceIds $managedInstance.Id -Role = @('Directory Readers')
+    $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId -Role = @('Directory Readers')
 }
 catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
@@ -156,7 +157,7 @@ catch {
  #>
 # Replikation abwarten
 
-Start-Sleep -Seconds 30
+Start-Sleep -Seconds 60
 
 try {
     $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
