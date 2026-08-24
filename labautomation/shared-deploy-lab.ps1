@@ -124,6 +124,15 @@ $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -Er
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
 
 try {
+    $managedInstance | Set-MhhManagedIdentityRoleMember -Role = @('Directory Readers')
+}
+catch {
+    Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
+    Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+<# 
+try {
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     $MIName = $managedInstance.ManagedInstanceName
@@ -140,9 +149,10 @@ catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
     Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
 }
-
+ #>
 # Replikation abwarten
-Start-Sleep -Seconds 120
+
+Start-Sleep -Seconds 30
 
 try {
     $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
