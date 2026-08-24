@@ -128,7 +128,7 @@ try {
     Write-Host "Connecting to MGraph..."
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
-    Write-Host "Calling Set-MhhManagedIdentityRoleMember..."
+    Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
     $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId -Role = @('Directory Readers')
 }
 catch {
