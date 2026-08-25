@@ -16,9 +16,9 @@ param storageAccountName string
 //param managedInstanceName string
 param managedInstanceFQDN string
 
-param AdminUsername string
+param adminUsername string
 @secure()
-param AdminPassword string
+param adminPassword string
 
 param teamVmSize string = 'Standard_D2s_v5'
 
@@ -44,8 +44,8 @@ module teamVms 'modules/team-vm.bicep' = {
     subnetId: vnet.properties.subnets[2].id
     vmSize: teamVmSize
     vmName: vmName
-    AdminUsername: AdminUsername
-    AdminPassword: AdminPassword
+    adminUsername: adminUsername
+    adminPassword: adminPassword
     tags: tags
   }
 }

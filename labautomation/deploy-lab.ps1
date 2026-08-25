@@ -35,8 +35,8 @@ Write-Host "[$SubscriptionId] Running deploy-lab.ps1 in $scriptPath"
 # Lab environment configuration
 $environmentName = "sqlhack"
 $sharedResourceGroupName = "rg-sqlhack-shared"
-$AdminUsername = "DemoUser"
-$AdminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
+$adminUsername = "DemoUser"
+$adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 
 # Template file path
 $templatePath = Join-Path $scriptPath "infra"
@@ -110,8 +110,8 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         environmentName           = $environmentName
         location                  = $effectiveLocation
         sharedResourceGroupName   = $sharedResourceGroupName
-        AdminUsername             = $AdminUsername
-        AdminPassword             = $AdminPassword
+        adminUsername             = $adminUsername
+        adminPassword             = $adminPassword
         storageAccountName        = $storageAccountName
         managedInstanceFQDN       = $managedInstanceFQDN
         vmName                    = $vmName
