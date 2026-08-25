@@ -212,7 +212,7 @@ for ($elapsed = 0; $elapsed -lt $timeoutSeconds; $elapsed += $pollIntervalSecond
             -ResourceGroupName $sharedResourceGroup `
             -InstanceName $managedInstanceName `
             -ErrorAction Stop
-        Write-Host "Expected Admin (ID): $SQLMiEntraAdmin.Id - Current Admin (ID): $($admin.ObjectId)"
+        Write-Host "Expected Admin (ID): $($SQLMiEntraAdmin.Id) - Current Admin (ID): $($admin.ObjectId)"
         if ($admin.ObjectId -eq $SQLMiEntraAdmin.Id)
         {
             Write-Host "Expected Entra ID Admin is configured."
