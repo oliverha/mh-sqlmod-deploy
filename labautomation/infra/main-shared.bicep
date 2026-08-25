@@ -6,16 +6,15 @@ param environmentName string
 
 param location string
 
-param adminUsername string
 param repoBaseURL string = 'https://raw.githubusercontent.com/oliverha/mh-sqlmod-deploy/main/labautomation'
 
+param AdminUsername string
 @secure()
-param adminPassword string
+param AdminPassword string
 
-param sqlMiAdminUsername string
-
+param SqlMiAdminUsername string
 @secure()
-param sqlMiAdminPassword string
+param SqlMiAdminPassword string
 
 param vnetAddressPrefix string = '10.0.0.0/16'
 param managedInstanceSubnetPrefix string = '10.0.1.0/24'
@@ -102,8 +101,8 @@ module legacySqlVm 'modules/sql2016-vm.bicep' = {
     subnetId: network.outputs.managementSubnetId
     privateIPAddress: '10.0.2.5'
     vmSize: legacyVmSize
-    adminUsername: adminUsername
-    adminPassword: adminPassword
+    adminUsername: AdminUsername
+    adminPassword: AdminPassword
     tags: tags
   }
 }
@@ -117,8 +116,8 @@ module sqlarcSqlVm 'modules/sql2022-vm.bicep' = {
     subnetId: network.outputs.managementSubnetId
     privateIPAddress: '10.0.2.6'
     vmSize: sqlarcVmSize
-    adminUsername: adminUsername
-    adminPassword: adminPassword
+    adminUsername: AdminUsername
+    adminPassword: AdminPassword
     tags: tags
   }
 }
@@ -130,8 +129,8 @@ module managedInstance 'modules/managed-instance.bicep' = {
     location: location
     managedInstanceName: managedInstanceName
     subnetId: network.outputs.managedInstanceSubnetId
-    administratorLogin: sqlMiAdminUsername
-    administratorLoginPassword: sqlMiAdminPassword
+    administratorLogin: SqlMiAdminUsername
+    administratorLoginPassword: SqlMiAdminPassword
     vCores: managedInstanceVCores
     storageSizeInGB: managedInstanceStorageGB
     tags: tags
@@ -173,8 +172,10 @@ module legacySqlVm_cse 'modules/sql2016-vm-cse.bicep' = {
     location: location
     vmName: legacySQLName
     labCount: labCount
-    adminUsername: adminUsername
-    adminPassword: adminPassword
+    AdminUsername: AdminUsername
+    AdminPassword: AdminPassword
+    SqlMiAdminUsername: SqlMiAdminUsername
+    SqlMiAdminPassword: SqlMiAdminPassword
     storageAccountName: storageAccountName
     managedInstanceServer: managedInstance.outputs.fullyQualifiedDomainName
     repoBaseURL: repoBaseURL
@@ -190,8 +191,8 @@ module sqlarcSqlVm_cse 'modules/sql2022-vm-cse.bicep' = {
   params: {
     location: location
     vmName: 'arcSQL2022'
-    adminUsername: adminUsername
-    adminPassword: adminPassword
+    AdminUsername: AdminUsername
+    AdminPassword: AdminPassword
     repoBaseURL: repoBaseURL
   }
 }

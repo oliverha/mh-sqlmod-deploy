@@ -2,11 +2,11 @@ param location string
 
 param subnetId string
 param vmSize string
-param adminUsername string
 param vmName string
 
+param AdminUsername string
 @secure()
-param adminPassword string
+param AdminPassword string
 
 param tags object
 
@@ -44,8 +44,8 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
 
     osProfile: {
       computerName: vmName
-      adminUsername: adminUsername
-      adminPassword: adminPassword
+      adminUsername: AdminUsername
+      adminPassword: AdminPassword
 
       windowsConfiguration: {
         provisionVMAgent: true
