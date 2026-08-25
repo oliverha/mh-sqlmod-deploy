@@ -125,11 +125,11 @@ $managedInstanceName = $managedInstance.ManagedInstanceName
 $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 [string]$managedInstanceResourceId = $managedInstance.Id
 $managedInstancePrincipalId = $managedInstance.Identity.PrincipalId
-$RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
 
 try {
     Write-Host "Connecting to MGraph..."
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
+    $RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
     $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId
