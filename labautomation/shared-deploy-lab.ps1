@@ -124,13 +124,13 @@ $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -Er
 $managedInstanceName = $managedInstance.ManagedInstanceName
 $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 [string]$managedInstanceResourceId = $managedInstance.Id
-$managedInstancePrincipalId = $managedInstance.Identity.PrincipalId
+#$managedInstancePrincipalId = $managedInstance.Identity.PrincipalId
 
 try {
     Write-Host "Connecting to MGraph..."
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
-    $RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
+    #$RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
     Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
     $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId
     Write-Host "Calling Set-MhhManagedIdentityRoleMember returned $return ..."
@@ -142,6 +142,9 @@ catch {
     Write-Host $return
 }
 
+Start-Sleep -Seconds 30
+
+<# 
 $timeoutSeconds = 120
 $pollIntervalSeconds = 10
 $found = $false
@@ -163,6 +166,7 @@ if (-not $found)
 {
     throw "Managed Identity did not appear in Directory Readers role within 2 minutes."
 }
+ #>
 
 try {
     $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
