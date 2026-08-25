@@ -177,6 +177,7 @@ try {
     #    -DisplayName $SQLMiEntraAdmin.DisplayName `
     #    -ObjectId $SQLMiEntraAdmin.Id -ErrorAction Stop
     
+    Write-Host "Configuring $($SQLMiEntraAdmin.UserPrincipalName) as Entra ID Admin for SQLMI ..."
     # Concatenate the query string; "$var?api-version=..." interpolates as a scoped variable.
     $adminPath = $managedInstance.Id + '/administrators/ActiveDirectory?api-version=2023-08-01-preview'
     $payload = @{
@@ -188,6 +189,7 @@ try {
         }
     } | ConvertTo-Json -Depth 5
     $resp = Invoke-AzRestMethod -Method PUT -Path $adminPath -Payload $payload
+    Write-Host "Configuring $($SQLMiEntraAdmin.UserPrincipalName) as Entra ID Admin for SQLMI returned $($resp.StatusCode) ..."
     if ($resp.StatusCode -notin 200, 201, 202) {
         throw "Set MI Entra admin failed (HTTP $($resp.StatusCode)): $($resp.Content)"
     }
@@ -210,8 +212,8 @@ for ($elapsed = 0; $elapsed -lt $timeoutSeconds; $elapsed += $pollIntervalSecond
             -ResourceGroupName $sharedResourceGroup `
             -InstanceName $managedInstanceName `
             -ErrorAction Stop
-
-        if ($admin.Id -eq $SQLMiEntraAdmin.Id)
+        Write-Host "Expected Admin (ID): $SQLMiEntraAdmin.Id - Current Admin (ID): $($admin.ObjectId)"
+        if ($admin.ObjectId -eq $SQLMiEntraAdmin.Id)
         {
             Write-Host "Expected Entra ID Admin is configured."
 
