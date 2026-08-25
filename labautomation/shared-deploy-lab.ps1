@@ -239,4 +239,4 @@ if (-not $found)
 @{"HackboxCredential" = @{name = 'VM User Name'; value = $adminUsername; note = 'Username to connect for every VM'}}
 @{"HackboxCredential" = @{name = 'VM User Password'; value = $adminPassword; note = 'Password to connect to every VM'}}
 @{"HackboxCredential" = @{name = 'SQLMI User Name'; value = $sqlMiAdminUsername; note = 'Username to connect to SQLMI'}}
-@{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $sqlMiAdminPassword; note = 'Password to connect to every VM'}}
+@{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $sqlMiAdminPassword; note = 'Password to connect to SQLMI'}}
