@@ -3,8 +3,10 @@ param(
     [string]$BackupBaseUri,
     [string]$StorageAccountName,
     [string]$ManagedInstanceServer,    
-    [string]$SysAdminUsername,
-    [string]$SysAdminPassword
+    [string]$AdminUsername,
+    [string]$AdminPassword,
+    [string]$SqlMiAdminUsername,
+    [string]$SqlMiAdminPassword
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,14 +16,14 @@ Write-Host "Configuring SQL Firewall..."
 
 Write-Host "Restoring Team Databases..."
 
-& .\Restore-TeamDatabases.ps1 -LabCount $LabCount -BackupBaseUri $BackupBaseUri -sqlusername $SysAdminUsername -sqlpassword $SysAdminPassword
+& .\Restore-TeamDatabases.ps1 -LabCount $LabCount -BackupBaseUri $BackupBaseUri -sqlusername $AdminUsername -sqlpassword $AdminPassword
 
-& .\Configure-legacySQL.ps1 -sqlusername $SysAdminUsername -sqlpassword $SysAdminPassword
+& .\Configure-legacySQL.ps1 -sqlusername $AdminUsername -sqlpassword $AdminPassword
 
 & .\Install-AzureCLI.ps1
 
-& .\Restore-TeamDatabasesMI.ps1 -BackupBaseUri $BackupBaseUri -sqlusername $SysAdminUsername -sqlpassword $SysAdminPassword -StorageAccountName $StorageAccountName -ManagedInstanceServer $ManagedInstanceServer
+& .\Restore-TeamDatabasesMI.ps1 -BackupBaseUri $BackupBaseUri -sqlusername $SqlMiAdminUsername -sqlpassword $SqlMiAdminPassword -StorageAccountName $StorageAccountName -ManagedInstanceServer $ManagedInstanceServer
 
-& .\Configure-SQLMI.ps1 -ManagedInstanceServer $ManagedInstanceServer -sqlusername $SysAdminUsername -sqlpassword $SysAdminPassword
+& .\Configure-SQLMI.ps1 -ManagedInstanceServer $ManagedInstanceServer -sqlusername $SqlMiAdminUsername -sqlpassword $SqlMiAdminPassword
 
 Write-Host "Bootstrap completed."

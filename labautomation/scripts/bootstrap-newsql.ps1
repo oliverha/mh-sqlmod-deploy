@@ -1,7 +1,7 @@
 param(
     [string]$BackupUri,
-    [string]$SysAdminUsername,
-    [string]$SysAdminPassword    
+    [string]$AdminUsername,
+    [string]$AdminPassword    
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +11,6 @@ Write-Host "Configuring SQL Firewall..."
 
 Write-Host "Restoring Sample Database..."
 
-& .\Restore-SampleDatabases.ps1 -BackupUri $BackupUri -sqlusername $SysAdminUsername -sqlpassword $SysAdminPassword
+& .\Restore-SampleDatabases.ps1 -BackupUri $BackupUri -sqlusername $AdminUsername -sqlpassword $AdminPassword
 
 Write-Host "Bootstrap completed."

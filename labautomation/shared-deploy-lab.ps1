@@ -60,10 +60,10 @@ catch {
 # no resource group is pre-created for this hook, so pick your own name and never use a participant's resource group
 $environmentName = "sqlhack"  # template produces rg-sqlhack-shared
 $sharedResourceGroup = "rg-${environmentName}-shared"
-$adminUsername = "DemoUser"
-$adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
-$sqlMiAdminUsername = "DemoUser"
-$sqlMiAdminPassword = New-MhhStablePassword -Purpose 'sqlmi-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
+$AdminUsername = "DemoUser"
+$AdminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
+$SqlMiAdminUsername = "DemoUser"
+$SqlMiAdminPassword = New-MhhStablePassword -Purpose 'sqlmi-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 $legacySQLName = "legacySQL2016"
 $arcSQLName = "arcSQL2022"
 
@@ -105,10 +105,10 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
     -TemplateParameterObject @{
         environmentName                     = $environmentName  # z.B. "sqlhack"
         location                            = $PreferredLocation[0]
-        adminUsername                       = $adminUsername
-        adminPassword                       = $adminPassword
-        sqlMiAdminUsername                  = $sqlMiAdminUsername
-        sqlMiAdminPassword                  = $sqlMiAdminPassword
+        AdminUsername                       = $AdminUsername
+        AdminPassword                       = $AdminPassword
+        SqlMiAdminUsername                  = $SqlMiAdminUsername
+        SqlMiAdminPassword                  = $SqlMiAdminPassword
         legacySQLName                       = $legacySQLName
         arcSQLName                          = $arcSQLName
         labCount                            = $LabCount
@@ -230,7 +230,7 @@ if (-not $found)
 @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'}}
 @{"HackboxCredential" = @{name = 'Arc SQL Server Name'; value = $arcSQLName; note = 'Name of new SQL Server'}}
 
-@{"HackboxCredential" = @{name = 'VM User Name'; value = $adminUsername; note = 'Username to connect for every VM'}}
-@{"HackboxCredential" = @{name = 'VM User Password'; value = $adminPassword; note = 'Password to connect to every VM'}}
-@{"HackboxCredential" = @{name = 'SQLMI User Name'; value = $sqlMiAdminUsername; note = 'Username to connect to SQLMI'}}
-@{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $sqlMiAdminPassword; note = 'Password to connect to every VM'}}
+@{"HackboxCredential" = @{name = 'VM User Name'; value = $AdminUsername; note = 'Username to connect for every VM'}}
+@{"HackboxCredential" = @{name = 'VM User Password'; value = $AdminPassword; note = 'Password to connect to every VM'}}
+@{"HackboxCredential" = @{name = 'SQLMI User Name'; value = $SqlMiAdminUsername; note = 'Username to connect to SQLMI'}}
+@{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $SqlMiAdminPassword; note = 'Password to connect to every VM'}}

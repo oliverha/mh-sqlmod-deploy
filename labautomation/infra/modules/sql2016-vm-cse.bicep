@@ -3,13 +3,17 @@ param vmName string
 param labCount int
 param storageAccountName string
 param managedInstanceServer string
-param adminUsername string
 param repoBaseURL string
 
+param AdminUsername string
 @secure()
-param adminPassword string
+param AdminPassword string
 
-var ConfigureSQLMachineCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-legacy.ps1" -LabCount ${labCount} -BackupBaseUri "${repoBaseURL}/Databases" -SysAdminUsername ${adminUsername} -SysAdminPassword ${adminPassword} -StorageAccountName ${storageAccountName} -ManagedInstanceServer ${managedInstanceServer}'
+param SqlMiAdminUsername string
+@secure()
+param SqlMiAdminPassword string
+
+var ConfigureSQLMachineCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-legacy.ps1" -LabCount ${labCount} -BackupBaseUri "${repoBaseURL}/Databases" -AdminUsername ${AdminUsername} -AdminPassword ${AdminPassword} -SqlMiAdminUsername ${SqlMiAdminUsername} -SqlMiAdminPassword ${SqlMiAdminPassword} -StorageAccountName ${storageAccountName} -ManagedInstanceServer ${managedInstanceServer}'
 
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' existing = {
   name: vmName
