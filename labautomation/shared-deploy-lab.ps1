@@ -130,6 +130,7 @@ try {
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
     Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
     $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId
+    Write-Host "Calling Set-MhhManagedIdentityRoleMember returned $return ..."
 }
 catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
