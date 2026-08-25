@@ -61,9 +61,9 @@ catch {
 $environmentName = "sqlhack"  # template produces rg-sqlhack-shared
 $sharedResourceGroup = "rg-${environmentName}-shared"
 $adminUsername = "DemoUser"
-$adminPassword = "Demo@pass1234567"
+$adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 $sqlMiAdminUsername = "DemoUser"
-$sqlMiAdminPassword = "Demo@pass1234567"
+$sqlMiAdminPassword = New-MhhStablePassword -Purpose 'sqlmi-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 $legacySQLName = "legacySQL2016"
 $arcSQLName = "arcSQL2022"
 
@@ -121,8 +121,11 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 # @{"HackboxCredential" = @{ name = "AdminPassword" ; value = "TopSecret"; note = "Useful info here" }}
 
 $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1
-$managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
+$managedInstanceName = $managedInstance.ManagedInstanceName
+$managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 [string]$managedInstanceResourceId = $managedInstance.Id
+$managedInstancePrincipalId = $managedInstance.Identity.PrincipalId
+$RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
 
 try {
     Write-Host "Connecting to MGraph..."
@@ -139,42 +142,88 @@ catch {
     Write-Host $return
 }
 
-<# 
-try {
-    $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
-    Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
-    $MIName = $managedInstance.ManagedInstanceName
-    # Find MI service principal
-    $miSp = Get-MgServicePrincipal -Filter "displayName eq '$MIName'" -ErrorAction Stop
-    # Find Directory Readers role
-    $roleDirectoryReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"} -ErrorAction Stop
-    # Assign role
-    New-MgDirectoryRoleMemberByRef -DirectoryRoleId $roleDirectoryReaders.Id -BodyParameter @{
-        "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($miSp.Id)"
-    } -ErrorAction Stop
+$timeoutSeconds = 120
+$pollIntervalSeconds = 10
+$found = $false
+for ($elapsed = 0; $elapsed -lt $timeoutSeconds; $elapsed += $pollIntervalSeconds)
+{
+    Write-Host "Checking Directory Readers membership ($elapsed seconds)..."
+    $members = Get-MgDirectoryRoleMember `
+        -DirectoryRoleId $RoleDirReaders.Id `
+        -All
+    if ($members.Id -contains $managedInstancePrincipalId)
+    {
+        $found = $true
+        Write-Host "Managed Identity found in Directory Readers role."
+        break
+    }
+    Start-Sleep -Seconds $pollIntervalSeconds
 }
-catch {
-    Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
-    Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
+if (-not $found)
+{
+    throw "Managed Identity did not appear in Directory Readers role within 2 minutes."
 }
- #>
-# Replikation abwarten
-
-Start-Sleep -Seconds 60
 
 try {
     $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
     # Entra Admin auf der MI setzen
-    $return = Set-AzSqlInstanceActiveDirectoryAdministrator `
-        -ResourceGroupName $sharedResourceGroup `
-        -InstanceName $managedInstance.ManagedInstanceName `
-        -DisplayName $SQLMiEntraAdmin.DisplayName `
-        -ObjectId $SQLMiEntraAdmin.Id -ErrorAction Stop
+    #$return = Set-AzSqlInstanceActiveDirectoryAdministrator `
+    #    -ResourceGroupName $sharedResourceGroup `
+    #    -InstanceName $managedInstance.ManagedInstanceName `
+    #    -DisplayName $SQLMiEntraAdmin.DisplayName `
+    #    -ObjectId $SQLMiEntraAdmin.Id -ErrorAction Stop
+    
+    # Concatenate the query string; "$var?api-version=..." interpolates as a scoped variable.
+    $adminPath = $managedInstance.Id + '/administrators/ActiveDirectory?api-version=2023-08-01-preview'
+    $payload = @{
+        properties = @{
+            administratorType = 'ActiveDirectory'
+            login             = $SQLMiEntraAdmin.UserPrincipalName
+            sid               = $SQLMiEntraAdmin.Id
+            tenantId          = (Get-AzContext).Tenant.Id
+        }
+    } | ConvertTo-Json -Depth 5
+    $resp = Invoke-AzRestMethod -Method PUT -Path $adminPath -Payload $payload
+    if ($resp.StatusCode -notin 200, 201, 202) {
+        throw "Set MI Entra admin failed (HTTP $($resp.StatusCode)): $($resp.Content)"
+    }
 }
 catch {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
     $ErrorString = $_ | format-list -force | Out-String
     Write-Host "ERR: $ErrorString" -ForegroundColor Red
+}
+
+$timeoutSeconds = 120
+$pollIntervalSeconds = 10
+$found = $false
+for ($elapsed = 0; $elapsed -lt $timeoutSeconds; $elapsed += $pollIntervalSeconds)
+{
+    Write-Host "Checking Entra ID Admin ($elapsed seconds)..."
+    try
+    {
+        $admin = Get-AzSqlInstanceActiveDirectoryAdministrator `
+            -ResourceGroupName $sharedResourceGroup `
+            -InstanceName $managedInstanceName `
+            -ErrorAction Stop
+
+        if ($admin.Id -eq $SQLMiEntraAdmin.Id)
+        {
+            Write-Host "Expected Entra ID Admin is configured."
+
+            $found = $true
+            break
+        }
+    }
+    catch
+    {
+        Write-Host "No Entra ID Admin configured yet."
+    }
+    Start-Sleep -Seconds $pollIntervalSeconds
+}
+if (-not $found)
+{
+    throw "Expected Entra ID Admin was not configured within 2 minutes."
 }
 
 @{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'}}

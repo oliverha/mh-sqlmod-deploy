@@ -35,9 +35,8 @@ Write-Host "[$SubscriptionId] Running deploy-lab.ps1 in $scriptPath"
 # Lab environment configuration
 $environmentName = "sqlhack"
 $sharedResourceGroupName = "rg-sqlhack-shared"
-#$resourceGroupName = "rg-sqlhack"
 $adminUsername = "DemoUser"
-$adminPassword = "Demo@pass1234567"
+$adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 
 # Template file path
 $templatePath = Join-Path $scriptPath "infra"
