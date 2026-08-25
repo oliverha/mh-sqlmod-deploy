@@ -133,7 +133,9 @@ try {
 }
 catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
-    Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Host "ERR: $ErrorString" -ForegroundColor Red
+    Write-Host $return
 }
 
 <# 
@@ -170,7 +172,8 @@ try {
 }
 catch {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
-    Write-Host "ERR: $($_.Exception.Message)" -ForegroundColor Red
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Host "ERR: $ErrorString" -ForegroundColor Red
 }
 
 @{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'}}
