@@ -26,8 +26,6 @@ param PrivateEndpointsSubnetPrefix string = '10.0.5.0/24'
 param legacySQLName string
 param arcSQLName string
 
-param labCount int = 8
-
 param legacyVmSize string = 'Standard_D4s_v5'
 param sqlarcVmSize string = 'Standard_D2s_v5'
 
@@ -174,7 +172,6 @@ module legacySqlVm_cse 'modules/sql2016-vm-cse.bicep' = {
   params: {
     location: location
     vmName: legacySQLName
-    labCount: labCount
     adminUsername: adminUsername
     adminPassword: adminPassword
     sqlMiAdminUsername: sqlMiAdminUsername

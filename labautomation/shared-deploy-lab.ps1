@@ -78,12 +78,6 @@ Write-Host "[$SubscriptionId] Deploying shared resources from template $template
 
 Write-Host $AllowedEntraUserIds
 
-$LabUsers = @(Get-MhhLabUser -UserId @($AllowedEntraUserIds)) | Where-Object { $_.ShortName -like "labuser-*" }
-$LabCount = $LabUsers.Count
-if ($LabCount -eq 0) {
-    $LabCount = 1
-}
-
 New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -Force -ErrorAction Stop
 
 $tags = @{
@@ -111,7 +105,6 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         sqlMiAdminPassword                  = $sqlMiAdminPassword
         legacySQLName                       = $legacySQLName
         arcSQLName                          = $arcSQLName
-        labCount                            = $LabCount
     }
 
 Write-Host "[$SubscriptionId] Result: $($result)"
