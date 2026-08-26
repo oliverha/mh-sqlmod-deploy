@@ -1,6 +1,9 @@
 param location string
 param managedInstanceName string
 param subnetId string
+param privateEndpointName string
+param privateEndpointSubnetId string
+param vnetId string
 param administratorLogin string
 
 @secure()
@@ -59,6 +62,66 @@ resource managedInstance 'Microsoft.Sql/managedInstances@2025-02-01-preview' = {
     minimalTlsVersion: '1.2'
     requestedBackupStorageRedundancy: 'Local'
     timezoneId: 'UTC'
+  }
+}
+
+resource managedInstancePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: privateEndpointName
+  location: location
+
+  properties: {
+    subnet: {
+      id: privateEndpointSubnetId
+    }
+
+    privateLinkServiceConnections: [
+      {
+        name: 'managedInstanceConnection'
+
+        properties: {
+          privateLinkServiceId: managedInstance.id
+          groupIds: [
+            'managedInstance'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource sqlPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.${environment().suffixes.sqlServerHostname}'
+  location: 'global'
+}
+
+resource sqlPrivateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  name: 'vnet-link'
+  parent: sqlPrivateDnsZone
+  location: 'global'
+
+  properties: {
+    registrationEnabled: false
+
+    virtualNetwork: {
+      id: vnetId
+    }
+  }
+}
+
+resource managedInstancePrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  name: 'default'
+  parent: managedInstancePrivateEndpoint
+
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'sql'
+
+        properties: {
+          privateDnsZoneId: sqlPrivateDnsZone.id
+        }
+      }
+    ]
   }
 }
 

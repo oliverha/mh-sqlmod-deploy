@@ -2,7 +2,7 @@ param location string
 param storageAccountName string
 param tags object
 param privateEndpointName string
-param subnetId string
+param privateEndpointSubnetId string
 param vnetId string
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
@@ -47,7 +47,7 @@ resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' 
 
   properties: {
     subnet: {
-      id: subnetId
+      id: privateEndpointSubnetId
     }
 
     privateLinkServiceConnections: [
@@ -71,7 +71,8 @@ resource blobDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
 }
 
 resource dnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  name: '${blobDnsZone.name}/vnet-link'
+  name: 'vnet-link'
+  parent: blobDnsZone
   location: 'global'
 
   properties: {
@@ -84,7 +85,8 @@ resource dnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024
 }
 
 resource storagePrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  name: '${storagePrivateEndpoint.name}/default'
+  name: 'default'
+  parent: storagePrivateEndpoint
  
   properties: {
     privateDnsZoneConfigs: [

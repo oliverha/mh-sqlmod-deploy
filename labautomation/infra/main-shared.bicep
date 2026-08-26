@@ -129,6 +129,9 @@ module managedInstance 'modules/managed-instance.bicep' = {
     location: location
     managedInstanceName: managedInstanceName
     subnetId: network.outputs.managedInstanceSubnetId
+    privateEndpointName: '${managedInstanceName}-pe'
+    privateEndpointSubnetId: network.outputs.PrivateEndpointsSubnetId
+    vnetId: network.outputs.vnetId
     administratorLogin: sqlMiAdminUsername
     administratorLoginPassword: sqlMiAdminPassword
     vCores: managedInstanceVCores
@@ -144,7 +147,7 @@ module storage 'modules/storage.bicep' = {
     location: location
     storageAccountName: storageAccountName
     privateEndpointName: '${storageAccountName}-pe'
-    subnetId: network.outputs.PrivateEndpointsSubnetId
+    privateEndpointSubnetId: network.outputs.PrivateEndpointsSubnetId
     vnetId: network.outputs.vnetId
     tags: tags
   }
