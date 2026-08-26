@@ -1,6 +1,9 @@
 param(
     [string]$SamplesBaseUri,
     [string]$LabsBaseUri,
+    [string]$BackupBaseUri,
+    [string]$adminUsername,
+    [string]$adminPassword,
     [string]$WallpaperUri,  
     [string]$TeamName,
     [string]$ManagedInstanceServer,
