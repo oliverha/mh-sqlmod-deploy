@@ -85,6 +85,8 @@ if ($vmPostfix.Length -gt 12) {
 $vmPostfix = $vmPostfix -replace "_", "-"
 $vmName = "VM-$vmPostfix"
 $TeamName = $me.ShortName
+$legacySQLName = "legacySQL2016"
+
 
 $storageAccountName = Get-AzStorageAccount -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty StorageAccountName
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
@@ -109,6 +111,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         managedInstanceFQDN       = $managedInstanceFQDN
         vmName                    = $vmName
         TeamName                  = $TeamName
+        legacySQLName             = $legacySQLName
     }
 
 Write-Host "[$SubscriptionId] Lab deployment completed successfully"

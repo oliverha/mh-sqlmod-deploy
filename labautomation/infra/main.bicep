@@ -6,6 +6,7 @@ param location string
 
 param vmName string
 param TeamName string = 'TEAM01'
+param legacySQLName string
 
 @description('Name of the shared resource group for accessing shared resources')
 param sharedResourceGroupName string = ''
@@ -63,6 +64,7 @@ module teamVms_cse 'modules/team-vm-cse.bicep' = {
     managedInstanceServer: managedInstanceFQDN
     storageAccountName: storageAccountName
     TeamName: TeamName
+    legacySQLName: legacySQLName
     adminUsername: adminUsername
     adminPassword: adminPassword
   }

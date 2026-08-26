@@ -1,10 +1,9 @@
 param(
     [Parameter(Mandatory)]
     [string] $sqlusername,
-
     [Parameter(Mandatory)]
     [string] $sqlpassword,
-
+    [string] $ServerInstance = "localhost",
     [string]$TeamName = 'TEAM01'
 )
 
@@ -52,7 +51,7 @@ CLOSE DB_Crs
 DEALLOCATE DB_Crs
 "@
 
-$connectionString = "Data Source=.;Initial Catalog=master;TrustServerCertificate=True;"
+$connectionString = "Data Source=$ServerInstance;Initial Catalog=master;TrustServerCertificate=True;"
 $Connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 [System.Security.SecureString]$SQLPwd = $sqlpassword | ConvertTo-SecureString -AsPlainText -Force
 $SQLPwd.MakeReadOnly()

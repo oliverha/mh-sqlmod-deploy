@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory)]
     [string] $sqlusername,
-
     [Parameter(Mandatory)]
-    [string] $sqlpassword
+    [string] $sqlpassword,
+    [string]$ServerInstance = 'localhost'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,7 +28,7 @@ GO
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") | Out-Null
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
 
-$connectionString = "Data Source=.;Initial Catalog=master;TrustServerCertificate=True;"
+$connectionString = "Data Source=$ServerInstance;Initial Catalog=master;TrustServerCertificate=True;"
 $Connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 [System.Security.SecureString]$SQLPwd = $sqlpassword | ConvertTo-SecureString -AsPlainText -Force
 $SQLPwd.MakeReadOnly()

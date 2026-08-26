@@ -7,7 +7,8 @@ param(
     [string]$WallpaperUri,  
     [string]$TeamName,
     [string]$ManagedInstanceServer,
-    [string]$StorageAccountName
+    [string]$StorageAccountName,
+    [string]$ServerInstance
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,7 +23,7 @@ Write-Host "Installing Team Tools..."
 & .\install-team-tools.ps1
 
 Write-Host "Restoring Team Databases..."
-& .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $adminUsername -sqlpassword $adminPassword
+& .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $adminUsername -sqlpassword $adminPassword -ServerInstance $ServerInstance
 
 Write-Host "Configuring Team Databases..."
 & .\Configure-legacySQL-DB.ps1 -TeamName $TeamName -sqlusername $adminUsername -sqlpassword $adminPassword

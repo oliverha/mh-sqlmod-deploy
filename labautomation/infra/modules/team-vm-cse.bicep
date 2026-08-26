@@ -4,12 +4,13 @@ param managedInstanceServer string
 param storageAccountName string
 param vmName string
 param TeamName string = 'TEAM01'
+param legacySQLName string
 param adminUsername string
 @secure()
 param adminPassword string
 
 //var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamNumber ##teamNumber##'
-var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamName ${TeamName} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}" -BackupBaseUri "${repoBaseURL}/Databases" -adminUsername "${adminUsername}" -adminPassword "${adminPassword}"'
+var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamName ${TeamName} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}" -BackupBaseUri "${repoBaseURL}/Databases" -ServerInstance "${legacySQLName}" -adminUsername "${adminUsername}" -adminPassword "${adminPassword}"'
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' existing = {
   name: vmName
 }
