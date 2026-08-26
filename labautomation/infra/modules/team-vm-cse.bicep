@@ -11,9 +11,9 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' existing 
   name: vmName
 }
 
-resource installTeamTools 'Microsoft.Compute/virtualMachines/extensions@2024-11-01' = {
+resource ConfigureTeamMachine 'Microsoft.Compute/virtualMachines/extensions@2024-11-01' = {
   parent: virtualMachine
-  name: 'install-team-tools'
+  name: 'ConfigureTeamMachine'
   location: location
 
   properties: {

@@ -55,10 +55,10 @@ resource managedInstance 'Microsoft.Sql/managedInstances@2025-02-01-preview' = {
 
     isGeneralPurposeV2: true
 
-    //publicDataEndpointEnabled: false
-    publicDataEndpointEnabled: true
-    //proxyOverride: 'Proxy'
-    proxyOverride: 'Redirect'
+    publicDataEndpointEnabled: false
+    //publicDataEndpointEnabled: true
+    proxyOverride: 'Proxy'
+    //proxyOverride: 'Redirect'
     minimalTlsVersion: '1.2'
     requestedBackupStorageRedundancy: 'Local'
     timezoneId: 'UTC'

@@ -2,7 +2,7 @@
 param
 (
     [string] $WallpaperUri,
-    [string] $TeamNName = "TEAM01"
+    [string] $TeamName = "TEAM01"
 )
 
 $DownloadDirectory = "C:\MicroHack"
