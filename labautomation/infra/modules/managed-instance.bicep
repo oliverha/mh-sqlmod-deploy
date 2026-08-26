@@ -90,7 +90,7 @@ resource managedInstancePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024
 }
 
 resource sqlPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.${environment().suffixes.sqlServerHostname}'
+  name: 'privatelink${environment().suffixes.sqlServerHostname}'
   location: 'global'
 }
 
