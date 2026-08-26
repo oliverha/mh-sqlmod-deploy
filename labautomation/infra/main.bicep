@@ -63,6 +63,8 @@ module teamVms_cse 'modules/team-vm-cse.bicep' = {
     managedInstanceServer: managedInstanceFQDN
     storageAccountName: storageAccountName
     TeamName: TeamName
+    adminUsername: adminUsername
+    adminPassword: adminPassword
   }
 }
 
