@@ -5,7 +5,7 @@ param environmentName string
 param location string
 
 param vmName string
-param TeamNumber int = 1
+param TeamName string = 'TEAM01'
 
 @description('Name of the shared resource group for accessing shared resources')
 param sharedResourceGroupName string = ''
@@ -62,7 +62,7 @@ module teamVms_cse 'modules/team-vm-cse.bicep' = {
     repoBaseURL: repoBaseURL
     managedInstanceServer: managedInstanceFQDN
     storageAccountName: storageAccountName
-    TeamNumber: TeamNumber
+    TeamName: TeamName
   }
 }
 

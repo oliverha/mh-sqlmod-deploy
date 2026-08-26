@@ -19,50 +19,6 @@ GO
 EXEC sp_configure 'CLR Enabled', 1
 RECONFIGURE WITH OVERRIDE
 GO
-
-DECLARE @DefaultLogPath NVARCHAR(500)
-
-SELECT 
-    @DefaultLogPath = LEFT(physical_name, LEN(physical_name) - CHARINDEX('\', REVERSE(physical_name)) + 1) 
-FROM 
-    sys.master_files
-WHERE 
-    database_id = DB_ID('TEAM01_TenantDataDB')
-    AND file_id = 2;
-
-DECLARE @DBName VARCHAR(255)
-DECLARE @SQLCmd NVARCHAR(MAX)
-DECLARE DB_Crs CURSOR READ_ONLY FORWARD_ONLY FOR SELECT name FROM sys.databases WHERE name LIKE 'TEAM__[_]TenantDataDB' AND state_desc = 'ONLINE'
-OPEN DB_Crs
-FETCH NEXT FROM DB_Crs INTO @DBName
-
-WHILE @@FETCH_STATUS = 0
-BEGIN
-	SET @SQLCmd = 'USE [' + @DBName + ']
-	ALTER ASSEMBLY CLRUFDS WITH PERMISSION_SET = UNSAFE;
-	ALTER ASSEMBLY Database1 WITH PERMISSION_SET = UNSAFE;
-	'
-	--PRINT @SQLCmd
-	EXEC (@SQLCmd)
-
-	SET @SQLCmd = 'ALTER DATABASE [' + @DBName + ']
-	ADD LOG FILE (NAME = N''' + @DBName + '_Log2'', FILENAME = N''' + @DefaultLogPath + @DBName + '_Log2.ldf'');
-	'
-	--PRINT @SQLCmd
-	EXEC (@SQLCmd)
-
-	FETCH NEXT FROM DB_Crs INTO @DBName
-END
-CLOSE DB_Crs
-DEALLOCATE DB_Crs
-GO
---EXEC xp_instance_regwrite 
---    @rootkey = N'HKEY_LOCAL_MACHINE', 
---    @key = N'SOFTWARE\Microsoft\Microsoft SQL Server\MSSQLServer\HADR', 
---    @value_name = N'Hadr_Enabled', 
---    @type = N'REG_DWORD', 
---    @value = 1;
---GO
 USE [master]
 GO
 CREATE MASTER KEY ENCRYPTION BY PASSWORD = '$sqlpassword'

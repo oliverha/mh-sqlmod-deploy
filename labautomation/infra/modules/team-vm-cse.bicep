@@ -3,10 +3,10 @@ param repoBaseURL string
 param managedInstanceServer string
 param storageAccountName string
 param vmName string
-param TeamNumber int = 1
+param TeamName string = 'TEAM01'
 
 //var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamNumber ##teamNumber##'
-var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamNumber ${TeamNumber} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}"'
+var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamName ${TeamName} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}"'
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' existing = {
   name: vmName
 }
@@ -28,6 +28,8 @@ resource installTeamTools 'Microsoft.Compute/virtualMachines/extensions@2024-11-
         '${repoBaseURL}/scripts/Download-Samples.ps1'
         '${repoBaseURL}/scripts/bootstrap-teamvm.ps1'
         '${repoBaseURL}/scripts/Configure-Teams-Shortcuts.ps1'
+        '${repoBaseURL}/scripts/Restore-TeamDatabases.ps1'
+        '${repoBaseURL}/scripts/Configure-legacySQL-DB.ps1'
         '${repoBaseURL}/scripts/Download-Labs.ps1'
         '${repoBaseURL}/scripts/Configure-TeamWallpaper.ps1'
       ]

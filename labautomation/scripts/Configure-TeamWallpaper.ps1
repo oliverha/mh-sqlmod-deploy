@@ -2,13 +2,13 @@
 param
 (
     [string] $WallpaperUri,
-    [int] $TeamNumber = 1
+    [string] $TeamNName = "TEAM01"
 )
 
 $DownloadDirectory = "C:\MicroHack"
 $DownloadBaseWallpaperPath = Join-Path $DownloadDirectory "BaseWallpaper.jpg"
 $TeamWallpaperPath = Join-Path $DownloadDirectory "Wallpaper.jpg"
-[string]$TeamNumberStr = '{0:d2}' -f $TeamNumber
+#[string]$TeamNumberStr = '{0:d2}' -f $TeamNumber
 
 
 if (-not (Test-Path -LiteralPath "C:\MicroHack"))
@@ -33,7 +33,7 @@ try {
     Invoke-WebRequest -Uri $WallpaperUri -OutFile $DownloadBaseWallpaperPath -UseBasicParsing
     $ProgressPreference = $lastProgressPreference
 
-    Write-Host "Setting wallpaper for Team $TeamNumber..."
+    Write-Host "Setting wallpaper for $TeamNName ..."
     Add-Type -AssemblyName System.Drawing
 
     $img = [System.Drawing.Image]::FromFile($DownloadBaseWallpaperPath)
@@ -52,7 +52,8 @@ try {
     )
 
     $graphics.DrawString(
-        "TEAM $TeamNumberStr",
+#        "TEAM $TeamNumberStr",
+        $TeamNName,
         $font,
         $brush,
         1460,

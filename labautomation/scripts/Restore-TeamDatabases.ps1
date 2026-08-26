@@ -43,8 +43,7 @@ inserts the backup file name before the query string.
 param
 (
     [Parameter(Mandatory = $true)]
-    [ValidateRange(1, 999)]
-    [int] $LabCount,
+    [string]$TeamName = 'TEAM01',
 
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
@@ -694,34 +693,28 @@ foreach ($backupName in $backupNames)
     $downloadedBackups[$backupName] = $destination
 }
 
-$restoreCount = $LabCount * $backupNames.Count
-
 Write-Host ""
 Write-Host (
-    "Starting {0} database restores for {1} team(s)." -f
-    $restoreCount,
-    $LabCount
+    "Starting database restores team {1}." -f
+    $TeamName
 ) -ForegroundColor Cyan
 
-for ($teamNumber = 1; $teamNumber -le $LabCount; $teamNumber++)
+$teamPrefix = $TeamName
+
+foreach ($backupName in $backupNames)
 {
-    $teamPrefix = "TEAM{0:D2}" -f $teamNumber
+    $targetDatabaseName = "${teamPrefix}_${backupName}"
 
-    foreach ($backupName in $backupNames)
-    {
-        $targetDatabaseName = "${teamPrefix}_${backupName}"
-
-        Restore-TeamDatabase `
-            -DatabaseName $targetDatabaseName `
-            -BackupFile $downloadedBackups[$backupName] `
-            -DefaultDataPath $defaultDirectories.DataPath `
-            -DefaultLogPath $defaultDirectories.LogPath
-    }
+    Restore-TeamDatabase `
+        -DatabaseName $targetDatabaseName `
+        -BackupFile $downloadedBackups[$backupName] `
+        -DefaultDataPath $defaultDirectories.DataPath `
+        -DefaultLogPath $defaultDirectories.LogPath
 }
 
 Write-Host ""
 Write-Host (
-    "Completed. {0} team database set(s) were processed." -f $LabCount
+    "Completed. Team database for team {1} were processed." -f $TeamName
 ) -ForegroundColor Green
 
 Stop-Transcript

@@ -84,14 +84,7 @@ if ($vmPostfix.Length -gt 12) {
 }
 $vmPostfix = $vmPostfix -replace "_", "-"
 $vmName = "VM-$vmPostfix"
-$TeamNumberStr = $($me.ShortName).SubString($me.ShortName.length - 3, 3)
-if($TeamNumberStr -match "^\d+$")
-{
-   [int]$TeamNumber = $TeamNumberStr
-}
-else {
-   [int]$TeamNumber = 1
-}
+$TeamName = $me.ShortName
 
 $storageAccountName = Get-AzStorageAccount -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty StorageAccountName
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
@@ -115,7 +108,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         storageAccountName        = $storageAccountName
         managedInstanceFQDN       = $managedInstanceFQDN
         vmName                    = $vmName
-        TeamNumber                = $TeamNumber
+        TeamName                  = $TeamName
     }
 
 Write-Host "[$SubscriptionId] Lab deployment completed successfully"
@@ -125,3 +118,4 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 
 # feed the effective resource group back to the console
 @{"HackboxCredential" = @{ name = "ResourceGroupName" ; value = $effectiveResourceGroup; note = "The name of the resource group where lab resources are deployed" }}
+@{"HackboxCredential" = @{ name = "Team VM Name" ; value = $vmName; note = "The name of the Team VM" }}
