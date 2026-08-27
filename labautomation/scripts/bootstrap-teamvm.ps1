@@ -24,7 +24,7 @@ Write-Host "Restoring Team Databases..."
 & .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $adminUsername -sqlpassword $adminPassword -ServerInstance $ServerInstance
 
 Write-Host "Configuring Team Databases..."
-& .\Configure-legacySQL-DB.ps1 -TeamName $TeamName -sqlusername $adminUsername -sqlpassword $adminPassword
+& .\Configure-legacySQL-DB.ps1 -TeamName $TeamName -sqlusername $adminUsername -sqlpassword $adminPassword -ServerInstance $ServerInstance
 
 Write-Host "Installing Team Tools..."
 & .\install-team-tools.ps1
