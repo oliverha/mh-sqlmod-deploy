@@ -29,6 +29,8 @@ param(
     [string[]]$AllowedEntraUserIds = @()
 )
 
+$ErrorActionPreference = 'Stop'
+
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Write-Host "[$SubscriptionId] Running deploy-lab.ps1 in $scriptPath"
 

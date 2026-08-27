@@ -23,6 +23,8 @@ param(
     [string[]]$AllowedEntraUserIds = @()
 )
 
+$ErrorActionPreference = 'Stop'
+
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Write-Host "[$SubscriptionId] Running shared-deploy-lab.ps1 in $scriptPath"
 
@@ -70,8 +72,6 @@ $arcSQLName = "arcSQL2022"
 
 # deploy shared resources in the shared resource group (do not forget to assign the correct rbac roles to the allowed Entra users)
 # Invoke-MhhDeploymentWithRegionFallback creates/recreates the resource group, re-grants Owner and falls back to the next region
-
-# $template = Join-Path $scriptPath "template-shared.bicep"
 $templatePath = Join-Path $scriptPath "infra"
 $template = Join-Path $templatePath "main-shared.bicep"
 Write-Host "[$SubscriptionId] Deploying shared resources from template $template to resource group $sharedResourceGroup"
@@ -83,12 +83,6 @@ New-AzResourceGroup -Name $sharedResourceGroup -Location $PreferredLocation[0] -
 $tags = @{
     SecurityControl = "Ignore"
 }
-#$result = Invoke-MhhDeploymentWithRegionFallback `
-#    -PreferredLocations      $PreferredLocation `
-#    -TemplateFile            $template #`
-#    -TemplateParameterObject @{
-#        userIds = $AllowedEntraUserIds
-#    }
 
 $result = Invoke-MhhDeploymentWithRegionFallback `
     -PreferredLocations      $PreferredLocation `
@@ -123,7 +117,6 @@ try {
     Write-Host "Connecting to MGraph..."
     $token = (Get-AzAccessToken -ResourceTypeName MSGraph).Token
     Connect-MgGraph -AccessToken $token -NoWelcome -Erroraction Stop
-    #$RoleDirReaders = Get-MgDirectoryRole | Where-Object {$_.DisplayName -eq "Directory Readers"}
     Write-Host "Calling Set-MhhManagedIdentityRoleMember for $managedInstanceResourceId ..."
     $return = Set-MhhManagedIdentityRoleMember -ResourceId $managedInstanceResourceId
     Write-Host "Calling Set-MhhManagedIdentityRoleMember returned $return ..."
@@ -137,32 +130,9 @@ catch {
 
 Start-Sleep -Seconds 30
 
-<# 
-$timeoutSeconds = 120
-$pollIntervalSeconds = 10
-$found = $false
-for ($elapsed = 0; $elapsed -lt $timeoutSeconds; $elapsed += $pollIntervalSeconds)
-{
-    Write-Host "Checking Directory Readers membership ($elapsed seconds)..."
-    $members = Get-MgDirectoryRoleMember `
-        -DirectoryRoleId $RoleDirReaders.Id `
-        -All
-    if ($members.Id -contains $managedInstancePrincipalId)
-    {
-        $found = $true
-        Write-Host "Managed Identity found in Directory Readers role."
-        break
-    }
-    Start-Sleep -Seconds $pollIntervalSeconds
-}
-if (-not $found)
-{
-    throw "Managed Identity did not appear in Directory Readers role within 2 minutes."
-}
- #>
-
 try {
-    $SQLMiEntraAdmin = Get-AzADUser -ObjectId @($AllowedEntraUserIds)[0] -ErrorAction Stop
+    $FirstLabUser = Get-MhhLabUser -UserId @($AllowedEntraUserIds) | Where-Object { $_.ShortName.ToLower() -match "labuser-[0-9]{4}"} | Sort-Object -Property ShortName | Select-Object -First 1
+    $SQLMiEntraAdmin = Get-AzADUser -ObjectId $FirstLabUser.Id -ErrorAction Stop
     # Entra Admin auf der MI setzen
     #$return = Set-AzSqlInstanceActiveDirectoryAdministrator `
     #    -ResourceGroupName $sharedResourceGroup `
