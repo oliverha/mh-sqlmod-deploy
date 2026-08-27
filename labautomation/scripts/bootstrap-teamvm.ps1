@@ -20,14 +20,14 @@ try {
 Write-Host "Configure Team Wallpaper..."
 & .\Configure-TeamWallpaper.ps1 -WallpaperUri $WallpaperUri -TeamName $TeamName
 
-Write-Host "Installing Team Tools..."
-& .\install-team-tools.ps1
-
 Write-Host "Restoring Team Databases..."
 & .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $adminUsername -sqlpassword $adminPassword -ServerInstance $ServerInstance
 
 Write-Host "Configuring Team Databases..."
 & .\Configure-legacySQL-DB.ps1 -TeamName $TeamName -sqlusername $adminUsername -sqlpassword $adminPassword
+
+Write-Host "Installing Team Tools..."
+& .\install-team-tools.ps1
 
 Write-Host "Downloading Sample Files..."
 & .\Download-Samples.ps1 -SamplesBaseUri $SamplesBaseUri -ForceDownload
@@ -39,7 +39,7 @@ Write-Host "Configuring Teams Shortcuts..."
 & .\Configure-Teams-Shortcuts.ps1 -ManagedInstanceServer $ManagedInstanceServer -StorageAccountName $StorageAccountName
 }
 catch {
-    
+
 }
 
 Write-Host "Bootstrap completed."
