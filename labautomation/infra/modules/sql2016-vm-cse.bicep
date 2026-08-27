@@ -41,6 +41,7 @@ resource ConfigureSQLMachine 'Microsoft.Compute/virtualMachines/extensions@2024-
       fileUris: [
         '${repoBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
         //'${repoBaseURL}/scripts/Restore-TeamDatabases.ps1'
+        '${repoBaseURL}/scripts/Download-TeamDatabases.ps1'
         '${repoBaseURL}/scripts/bootstrap-legacy.ps1'
         '${repoBaseURL}/scripts/Restore-TeamDatabasesMI.ps1'
         '${repoBaseURL}/scripts/Install-AzureCLI.ps1'

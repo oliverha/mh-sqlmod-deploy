@@ -17,6 +17,10 @@ Write-Host "Configuring SQL Firewall..."
 #
 #& .\Restore-TeamDatabases.ps1 -LabCount $LabCount -BackupBaseUri $BackupBaseUri -sqlusername $adminUsername -sqlpassword $adminPassword
 
+Write-Host "Downloading Team Databases..."
+
+& .\Download-TeamDatabases.ps1 -BackupBaseUri $BackupBaseUri
+
 Write-Host "Configuring legacy SQL Server..."
 
 & .\Configure-legacySQL.ps1 -sqlusername $adminUsername -sqlpassword $adminPassword
