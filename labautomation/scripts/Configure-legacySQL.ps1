@@ -34,18 +34,7 @@ $Connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 $SQLPwd.MakeReadOnly()
 $cred = New-Object System.Data.SqlClient.SqlCredential($sqlusername,$SQLPwd)
 $Connection.credential = $cred
-#$Connection.open()
 
-#$command = New-Object system.Data.SqlClient.SqlCommand($Connection)
-#$command.Connection = $Connection
-#$command.CommandTimeout = $QueryTimeout
-
-#$command.CommandText = $ConfigureSql
-#$result = $command.ExecuteReader()
-#$table = New-Object System.Data.DataTable
-#$table.Load($result)
-
-# 5. SMO-Serververbindung initialisieren
 $serverConnection = New-Object Microsoft.SqlServer.Management.Common.ServerConnection($Connection)
 $server = New-Object Microsoft.SqlServer.Management.Smo.Server($serverConnection)
 
