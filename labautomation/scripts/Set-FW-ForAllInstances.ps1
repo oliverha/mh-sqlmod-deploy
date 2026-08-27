@@ -1,3 +1,5 @@
+$ErrorActionPreference = 'Stop'
+
 $logPath = 'C:\Windows\Temp\Set-FW-ForAllInstances.log'
 Start-Transcript -Path $logPath -Append
 

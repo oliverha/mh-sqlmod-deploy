@@ -5,11 +5,15 @@ param
     [string] $TeamName = "TEAM01"
 )
 
+$ErrorActionPreference = 'Stop'
+
+$logPath = 'C:\Windows\Temp\Configure-TeamWallpaper.log'
+Start-Transcript -Path $logPath -Append
+
 $DownloadDirectory = "C:\MicroHack"
 $DownloadBaseWallpaperPath = Join-Path $DownloadDirectory "BaseWallpaper.jpg"
 $TeamWallpaperPath = Join-Path $DownloadDirectory "Wallpaper.jpg"
 #[string]$TeamNumberStr = '{0:d2}' -f $TeamNumber
-
 
 if (-not (Test-Path -LiteralPath "C:\MicroHack"))
 {
@@ -76,3 +80,5 @@ try {
 catch {
     Write-Host "An error occurred while configuring the team wallpaper: $_"
 }
+
+Stop-Transcript

@@ -5,6 +5,11 @@ param
     [string] $StorageAccountName
 )
 
+$ErrorActionPreference = 'Stop'
+
+$logPath = 'C:\Windows\Temp\Configure-Teams-Shortcuts.log'
+Start-Transcript -Path $logPath -Append
+
 if (-not (Test-Path -LiteralPath "C:\MicroHack"))
 {
     New-Item `
@@ -59,3 +64,5 @@ if (Test-Path $Target) {
     $Link.IconLocation = "$Target,0"
     $Link.Save()
 }
+
+Stop-Transcript

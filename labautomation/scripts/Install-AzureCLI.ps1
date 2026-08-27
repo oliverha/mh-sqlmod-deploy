@@ -1,3 +1,5 @@
+$ErrorActionPreference = 'Stop'
+
 $logPath = 'C:\Windows\Temp\Install-AzureCLI.log'
 Start-Transcript -Path $logPath -Append
 

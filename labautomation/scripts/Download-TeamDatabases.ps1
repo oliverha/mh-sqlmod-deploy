@@ -53,6 +53,8 @@ param
     [switch] $ForceDownload
 )
 
+$ErrorActionPreference = 'Stop'
+
 $logPath = 'C:\Windows\Temp\Dwonload-TeamDatabases.log'
 Start-Transcript -Path $logPath -Append
 

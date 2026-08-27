@@ -10,6 +10,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$logPath = 'C:\Windows\Temp\bootstrap-legacy.log'
+Start-Transcript -Path $logPath -Append
+
 Write-Host "Configuring SQL Firewall..."
 & .\Set-FW-ForAllInstances.ps1
 
@@ -38,3 +41,5 @@ Write-Host "Configuring SQLMI..."
 & .\Configure-SQLMI.ps1 -ManagedInstanceServer $ManagedInstanceServer -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
 
 Write-Host "Bootstrap completed."
+
+Stop-Transcript

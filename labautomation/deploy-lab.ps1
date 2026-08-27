@@ -85,6 +85,7 @@ if ($vmPostfix.Length -gt 12) {
 $vmPostfix = $vmPostfix -replace "_", "-"
 $vmName = "VM-$vmPostfix"
 $TeamName = $me.ShortName
+$TeamName = $TeamName.ToUpper()
 $legacySQLName = "legacySQL2016"
 
 
@@ -122,3 +123,4 @@ Write-Host "[$SubscriptionId] Result: $($result)"
 # feed the effective resource group back to the console
 @{"HackboxCredential" = @{ name = "ResourceGroupName" ; value = $effectiveResourceGroup; note = "The name of the resource group where lab resources are deployed" }}
 @{"HackboxCredential" = @{ name = "Team VM Name" ; value = $vmName; note = "The name of the Team VM" }}
+@{"HackboxCredential" = @{ name = "Team / Link Name" ; value = $TeamName; note = "Name of the Team (Prefix for DBs and to use as Link Name for SQLMI)" }}

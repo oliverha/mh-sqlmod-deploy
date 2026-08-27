@@ -13,6 +13,8 @@ param
     [switch] $ForceDownload
 )
 
+$ErrorActionPreference = 'Stop'
+
 $logPath = 'C:\Windows\Temp\Download-Labs.log'
 Start-Transcript -Path $logPath -Append
 

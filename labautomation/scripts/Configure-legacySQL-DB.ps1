@@ -21,7 +21,7 @@ SELECT
 FROM 
     sys.master_files
 WHERE 
-    database_id = DB_ID('TEAM01_TenantDataDB')
+    database_id = DB_ID('$($TeamName)_TenantDataDB')
     AND file_id = 2;
 
 DECLARE @DBName VARCHAR(255)
