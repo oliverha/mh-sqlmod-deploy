@@ -695,7 +695,7 @@ foreach ($backupName in $backupNames)
 
 Write-Host ""
 Write-Host (
-    "Starting database restores team {1}." -f
+    "Starting database restores team {0}." -f
     $TeamName
 ) -ForegroundColor Cyan
 
@@ -714,7 +714,7 @@ foreach ($backupName in $backupNames)
 
 Write-Host ""
 Write-Host (
-    "Completed. Team database for team {1} were processed." -f $TeamName
+    "Completed. Team database for team {0} were processed." -f $TeamName
 ) -ForegroundColor Green
 
 Stop-Transcript
