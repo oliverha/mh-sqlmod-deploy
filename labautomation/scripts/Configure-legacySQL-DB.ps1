@@ -71,7 +71,8 @@ try {
     $table.Load($result)
 }
 catch {
-    Write-Error "Fehler bei der Ausführung: $_"
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Error "ERR: $ErrorString"
 }
 finally {
     if ($null -ne $serverConnection -and $serverConnection.IsOpen) {

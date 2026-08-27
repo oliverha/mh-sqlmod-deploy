@@ -123,9 +123,9 @@ try {
 }
 catch {
     Write-Host "Failed to grant 'Directory Readers' to Managed Identity of $managedInstanceFQDN." -ForegroundColor Red
-    $ErrorString = $_ | format-list -force | Out-String
-    Write-Host "ERR: $ErrorString" -ForegroundColor Red
     Write-Host $return
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Error "ERR: $ErrorString"
 }
 
 Start-Sleep -Seconds 30
@@ -160,7 +160,7 @@ try {
 catch {
     Write-Host "Failed to set Entra ID Admin on $managedInstanceFQDN." -ForegroundColor Red
     $ErrorString = $_ | format-list -force | Out-String
-    Write-Host "ERR: $ErrorString" -ForegroundColor Red
+    Write-Error "ERR: $ErrorString"
 }
 
 $timeoutSeconds = 120

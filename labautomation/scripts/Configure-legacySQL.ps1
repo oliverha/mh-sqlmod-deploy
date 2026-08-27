@@ -55,7 +55,8 @@ try {
     #Write-Host "Skript erfolgreich auf SQL MI ausgeführt." -ForegroundColor Green
 }
 catch {
-    Write-Error "Fehler bei der Ausführung: $_"
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Error "ERR: $ErrorString"
 }
 finally {
     if ($null -ne $serverConnection -and $serverConnection.IsOpen) {
@@ -72,11 +73,13 @@ Try {
     Write-Host "Installing and configuring Windows Failover Cluster..." -ForegroundColor Green
     Install-WindowsFeature -Name Failover-Clustering -IncludeManagementTools -IncludeAllSubFeature
     $clus = New-Cluster -Name "CLU01" -AdministrativeAccessPoint None -Verbose -Force
-    Enable-SqlAlwaysOn -Path SQLSERVER:\SQL\legacysql2016\default -Force    
+    Enable-SqlAlwaysOn -Path "SQLSERVER:\SQL\$($ServerInstance)\default" -Force    
     Restart-Service -Name "MSSQLSERVER" -Force
 }
 Catch {
-    Write-Host "Error configuring SQL legacy Instance: $_"
+    Write-Host "Error configuring SQL legacy Instance."
+    $ErrorString = $_ | format-list -force | Out-String
+    Write-Error "ERR: $ErrorString"
 }
 
 Stop-Transcript
