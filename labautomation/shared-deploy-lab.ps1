@@ -242,4 +242,4 @@ if (-not $found)
 $rg = Get-AzResourceGroup -Name $sharedResourceGroup -ErrorAction SilentlyContinue
 $tags = $rg.Tags
 $tags["microhack-shared-deployment"] = "Succeeded"
-Set-AzResourceGroup -Name $sharedResourceGroup -Tags $tags
+Set-AzResourceGroup -Name $sharedResourceGroup -Tags $tags | Out-Null
