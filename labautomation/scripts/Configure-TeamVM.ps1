@@ -91,4 +91,70 @@ New-ItemProperty -Path $cdmPath `
 
 Write-Output "Privacy Experience disabled."
 
+# Disable Microsoft Edge First Run Experience
+# Run as Administrator
+
+$edgePolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Edge"
+
+if (-not (Test-Path $edgePolicyPath))
+{
+    New-Item -Path $edgePolicyPath -Force | Out-Null
+}
+
+# Disable First Run Experience entirely
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "HideFirstRunExperience" `
+    -Value 1 `
+    -PropertyType DWord `
+    -Force | Out-Null
+
+# Disable browser sign-in prompts
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "BrowserSignin" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force | Out-Null
+
+# Disable importing browser data prompts
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "ImportOnEachLaunch" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force | Out-Null
+
+# Disable profile creation prompts
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "ImplicitSignInEnabled" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force | Out-Null
+
+# Optional: Disable Edge promotional dialogs
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "ShowRecommendationsEnabled" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force | Out-Null
+
+Write-Output "Edge First Run Experience disabled."
+
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "PromotionalTabsEnabled" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force
+
+New-ItemProperty `
+    -Path $edgePolicyPath `
+    -Name "EdgeWelcomePageEnabled" `
+    -Value 0 `
+    -PropertyType DWord `
+    -Force
+
 Stop-Transcript
