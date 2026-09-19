@@ -34,7 +34,7 @@
 # Connect to your Win11 VM
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|Connect to the Azure Portal with <secret group="Azure" name="Entra ID Username" show="true"></secret> and password <secret group="Azure" name="Entra ID TAP"></secret>.<br>In the Azure Portal open your Win11 VM <secret group="Lab-General" name="Team VM Name" show="true"></secret>.<br>Connect to the VM with Bastion with the following VM connection credentials Username <secret group="Lab-Credential" name="VM User Name" show="true"></secret> and password <secret group="Lab-Credential" name="VM User Password"></secret>.<br>Please make sure to select the correct keyboard language.|![Bastion Logon](../../Images/Bastion-VM11.png)| |
+|Connect to the Azure Portal with <secret group="Azure" name="Entra ID Username" show="true"></secret> and password <secret group="Azure" name="Entra ID TAP"></secret>.<br>In the Azure Portal open your Win11 VM <secret group="Lab-General" name="Team VM Name" show="true"></secret>.<br>Connect to the VM with Bastion with the following VM connection credentials Username <secret group="Lab-Credentials" name="VM User Name" show="true"></secret> and password <secret group="Lab-Credentials" name="VM User Password"></secret>.<br>Please make sure to select the correct keyboard language.|![Bastion Logon](../../Images/Bastion-VM11.png)| |
 
 
 
