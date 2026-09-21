@@ -24,9 +24,7 @@
 
 ![generated](../../Images/MigrationArchitecturev2.png)
 
-<a id="generic-migration-content"></a>
 # Generic Migration Content
-
 | **Narrative**  | **Notes**  |
 |:-----|:-------|
 | *Notes for outside of the workshop:*  *Familiarise yourself with the new Microsoft migration capabilities with SQL Server Management Studio and Migration options by using Arc* | Migrate SQL Server to Azure SQL (SSMS): [https://learn.microsoft.com/en-us/ssms/migrate/migrate-sql-server-azure-sql?tabs=sql-standard](https://learn.microsoft.com/en-us/ssms/migrate/migrate-sql-server-azure-sql?tabs=sql-standard) This article covers the migration from Arc-Enabled SQL Server instances and Non Arc-Enabled SQL Server instances. For Non Arc-Enabled SQL Server instances there will be no performance-based sizing recommendation. |
