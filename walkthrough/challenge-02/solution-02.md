@@ -28,6 +28,16 @@ In this challenge **GitHub Copilot is your main tool for finding and fixing perf
 
 [7. Fix the performance issue with GitHub Copilot](#7-fix-the-performance-issue-with-github-copilot)
 
+[8. Deepen your understanding with GitHub Copilot](#8-deepen-your-understanding-with-github-copilot)
+* [8.1 Which monitoring options exist?](#81-which-monitoring-options-exist)
+* [8.2 Query Store, plans and regressions](#82-query-store-plans-and-regressions)
+* [8.3 Waits and resource limits](#83-waits-and-resource-limits)
+* [8.4 Indexes and statistics](#84-indexes-and-statistics)
+* [8.5 Blocking, deadlocks and Extended Events](#85-blocking-deadlocks-and-extended-events)
+* [8.6 Alerts, baselines and dashboards](#86-alerts-baselines-and-dashboards)
+* [8.7 Scaling and cost](#87-scaling-and-cost)
+* [8.8 Using Copilot responsibly](#88-using-copilot-responsibly)
+
 [Prompt cheat sheet](#prompt-cheat-sheet)
 
 # Migration architecture and Azure components
@@ -63,7 +73,7 @@ Finding the bottleneck will help us determine what category issue we have so we 
 
 |**Narrative/Instructions**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|On your Team Win11 VM open **SQL Server Management Studio (SSMS)** and connect to the Azure SQL Managed Instance XXXXXX. **Authentication: Microsoft Entra MFA** **Login:** **<secret group="Azure" name="Entra ID Username" show="true"></secret>** **TAP:**  **<secret group="Azure" name="Entra ID TAP"></secret>**| **![](../../Images/4b05bbceae6c4c0d2c4e37e53e60dfd4.png)**|If SSMS is not connected to your Azure and GitHub accounts anymore, repeat the account steps from [Challenge 1](../challenge-01/solution-01.md#12-connect-ssms-with-your-azure-and-github-copilot-accounts).|
+|On your Team Win11 VM open **SQL Server Management Studio (SSMS)** and connect to the Azure SQL Managed Instance XXXXXX. **Authentication: Microsoft Entra MFA** **Login:** **<secret group="Azure" name="Entra ID Username" show="true"></secret>** **TAP:**  **<secret group="Azure" name="Entra ID TAP"></secret>**| **![](../../Images/Connect_SQLMI_00.png)**|If SSMS is not connected to your Azure and GitHub accounts anymore, repeat the account steps from [Challenge 1](../challenge-01/solution-01.md#12-connect-ssms-with-your-azure-and-github-copilot-accounts).|
 |In Object Explorer expand **Databases**, right-click **TenantCRM** and select **New Query**. Make sure the query window is connected to the **TenantCRM** database.|![New query window on TenantCRM](../../Images/SSMS_TenantCRM_NewQuery.png)|Copilot uses the connection of the active query window as context.|
 
 ## 1.2 Open the GitHub Copilot chat
@@ -134,7 +144,8 @@ Now that we can use the global monitoring tool Log Analytics to identify which S
 
 |**Narrative/Instructions**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|Ask Copilot to generate a KQL query for you.|![Copilot generates a KQL query](../../Images/Copilot_KQL_Generate_00.png)<br>![](../../Images/Copilot_KQL_Generate_01.png)|**Prompt**: *"Write a KQL query for the AzureDiagnostics table that shows the average CPU percentage of my SQL Managed Instance over the last 2 hours as a time chart."*|
+|This time we will be using Copilot from Azure Portal.|![Copilot in Azure Portal](../../Images/Copilot_KQL_Generate_00.png)||
+|Ask Copilot to generate a KQL query for you.|![Copilot generates a KQL query](../../Images/Copilot_KQL_Generate_01.png)|**Prompt**: *"Write a KQL query for the AzureDiagnostics table that shows the average CPU percentage of my SQL Managed Instance over the last 2 hours as a time chart."*|
 |On the Azure Portal, on the SQL Managed Instance Resource, **click on Logs** on the left Menu. You will find several query templates You can test the **CPU utilization threshold template** And modify the parameters if needed.|![](../../Images/7ac7f4ea0bf678241cccc8d2bc0e348f.png)||
 ||**![](../../Images/ce136344cc4d9c981d780e733b4260d7.png)**||
 |Create a new Query| ![](../../Images/ef049ae85146b0b3e9a80c2ccd6cbb58.png)||
@@ -159,6 +170,102 @@ In this exercise you will leverage GitHub Copilot to mitigate the performance is
 
 We have seen how GitHub Copilot can help us analyze and mitigate performance issues, and how the classic tools help us to verify the results.
 
+# 8. Deepen your understanding with GitHub Copilot
+
+This optional section contains additional prompts that help you to understand the bigger picture of monitoring and performance tuning on Azure SQL Managed Instance. No screenshots are needed. Run the prompts in the Copilot chat of SSMS (connected to **TenantCRM**) or in Copilot in the Azure Portal where noted, and ask follow-up questions.
+
+> **Tips**
+>
+> * Ask for **evidence**: *"Show me the DMV or query you used."*
+> * Ask for **tables** when you compare options.
+> * Features and tiers change. Ask Copilot to point to the **official documentation** and verify limits and availability there.
+> * In this section Copilot should only **read**. Add *"do not execute anything"* to every prompt that could change the database.
+
+## 8.1 Which monitoring options exist?
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Get the big picture.|**Prompt**: *"Which options do I have to monitor Azure SQL Managed Instance? Compare DMVs, Query Store, Azure Monitor metrics, diagnostic settings with Log Analytics, Extended Events and Database Watcher in a table by data source, retention, granularity and typical use case."*<br>**Learn**: Which tool answers which question, and where the data is stored.|
+|Understand real-time versus historical analysis.|**Prompt**: *"Which tools help me with a problem that is happening right now and which help me with a problem that happened last week?"*<br>**Learn**: DMVs show the current state, Query Store and Log Analytics keep history.|
+|Understand retention.|**Prompt**: *"How long is the data kept in sys.dm_db_resource_stats, sys.server_resource_stats, Query Store, Azure Monitor metrics and Log Analytics? How can I keep it longer?"*|
+|Understand the cost of monitoring.|**Prompt**: *"What does monitoring cost me in Azure, for example Log Analytics ingestion and retention? How can I reduce the cost without losing important information?"*|
+|Find out what is monitored by default.|**Prompt**: *"What is collected for my Managed Instance without any configuration, and what do I have to enable myself, for example diagnostic settings?"*|
+|Compare the tools with the lab.|**Prompt**: *"In this lab we used DMVs, Query Store, the Azure Portal and KQL. Which question did each tool answer best, and what would I miss if I only used one of them?"*|
+
+## 8.2 Query Store, plans and regressions
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand the Query Store.|**Prompt**: *"Explain how the Query Store captures queries, plans and runtime statistics, and how it differs from the plan cache and dm_exec_query_stats."*|
+|Find regressions.|**Prompt**: *"Show me a query that finds queries in TenantCRM whose average duration got worse in the last 24 hours compared with the previous 7 days. Use the Query Store views and do not change anything."*|
+|Understand plan regressions.|**Prompt**: *"What is a plan regression and why can the same stored procedure be fast for one parameter value and slow for another? Explain parameter sniffing with an example."*|
+|Understand plan forcing.|**Prompt**: *"When should I force a plan in the Query Store, and what are the risks? What happens if the forced plan becomes invalid?"*|
+|Learn the alternatives.|**Prompt**: *"Which options do I have to fix a parameter sniffing problem, for example OPTION (RECOMPILE), OPTIMIZE FOR, Query Store hints and parameter sensitive plan optimization? Compare them by effort and risk."*|
+|Understand automatic tuning.|**Prompt**: *"What is automatic tuning in Azure SQL and which parts of it are available on Managed Instance? Should I enable it for TenantCRM?"*|
+|Understand compatibility levels.|**Prompt**: *"How does the database compatibility level influence query performance and the optimizer? What should I check before I raise it for TenantCRM?"*|
+
+## 8.3 Waits and resource limits
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand wait statistics.|**Prompt**: *"Explain wait statistics and the most common wait types such as PAGEIOLATCH, LCK_M, CXPACKET, SOS_SCHEDULER_YIELD and WRITELOG. What does each one tell me?"*|
+|Read the wait statistics of the instance.|**Prompt**: *"Give me a query that shows the top wait types of the connected Managed Instance and filter out the harmless background waits. Explain the result."*|
+|Understand the resource limits.|**Prompt**: *"Which resource limits apply to Azure SQL Managed Instance, for example vCores, memory, storage, IOPS, log rate and tempdb? Where do I see that I hit one of them?"*|
+|Understand storage performance.|**Prompt**: *"How does the storage performance (IOPS and throughput) of the General Purpose tier depend on the file size? What does this mean for my databases?"*<br>**Learn**: Why file layout and size can matter for I/O on this tier.|
+|Compare the tiers.|**Prompt**: *"What are the performance differences between General Purpose and Business Critical for a workload with many small transactions and a lot of reads?"*|
+|Understand CPU pressure.|**Prompt**: *"How do I distinguish between a CPU problem caused by one expensive query and a CPU problem caused by many small queries or too few vCores?"*|
+
+## 8.4 Indexes and statistics
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand missing index suggestions.|**Prompt**: *"How reliable are the missing index recommendations of SQL Server? Why should I not create all of them?"*|
+|Find unused indexes.|**Prompt**: *"Show me indexes in TenantCRM that are not used for reads but cost write performance. Explain the limits of this analysis, for example after a restart."*|
+|Find duplicate indexes.|**Prompt**: *"Find duplicate or overlapping indexes in TenantCRM and tell me which ones I could consolidate. Do not execute anything."*|
+|Understand statistics.|**Prompt**: *"What are statistics, how are they updated on Managed Instance, and how can outdated statistics lead to bad execution plans?"*|
+|Understand fragmentation.|**Prompt**: *"Is index fragmentation still a relevant problem on modern storage? When should I rebuild or reorganize an index and when not?"*|
+|Think about maintenance.|**Prompt**: *"Which regular maintenance tasks do I have to implement on Managed Instance myself and which does the platform do for me?"*|
+
+## 8.5 Blocking, deadlocks and Extended Events
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Find blocking sessions.|**Prompt**: *"Give me a query that shows the current blocking chains in TenantCRM, including the head blocker and its SQL text."*|
+|Understand blocking versus deadlocks.|**Prompt**: *"Explain the difference between blocking and a deadlock with an example. How does SQL Server resolve each?"*|
+|Reduce blocking.|**Prompt**: *"Which options do I have to reduce blocking, for example read committed snapshot isolation, shorter transactions and better indexes? What are the trade-offs?"*|
+|Capture deadlocks.|**Prompt**: *"How do I find past deadlocks on Managed Instance? Show me how to read the deadlock graph from the system_health Extended Events session."*|
+|Learn Extended Events.|**Prompt**: *"Explain Extended Events and show me an example session for long-running queries that has a small performance impact. Do not execute anything."*|
+
+## 8.6 Alerts, baselines and dashboards
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Plan alerts.|**Prompt**: *"Which alerts should I configure for a Managed Instance, for example CPU, storage, log rate and failed connections? Suggest thresholds and explain them."*<br>**Tip**: Run this prompt in Copilot in the Azure Portal as well and compare.|
+|Understand baselines.|**Prompt**: *"What is a performance baseline and which metrics should I record regularly to recognize a regression early?"*|
+|Write more KQL.|**Prompt**: *"Write a KQL query that shows the five most frequent wait types of my Managed Instance over the last 24 hours as a bar chart."*<br>**Note**: Which tables exist depends on the diagnostic settings you configured.|
+|Build a dashboard.|**Prompt**: *"Which tiles belong on an Azure dashboard or workbook that gives the operations team a quick health overview of the Managed Instance?"*|
+|Route the alerts.|**Prompt**: *"Explain action groups in Azure Monitor and how I can notify a team by email or Teams when the CPU alert fires."*|
+|Create a runbook.|**Prompt**: *"Create a first-response checklist for the alert 'CPU above 90 percent for 15 minutes' on a Managed Instance with the steps, the queries to run and the escalation criteria."*|
+
+## 8.7 Scaling and cost
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Decide between tuning and scaling.|**Prompt**: *"When should I fix the query and when should I add vCores to the Managed Instance? Please give me a decision guide."*|
+|Understand how scaling works.|**Prompt**: *"How does scaling a Managed Instance up or down work, how long does it take, and is there downtime or a failover?"*|
+|Use read scale-out.|**Prompt**: *"Can I offload reporting queries from the primary Managed Instance? Explain the read scale-out and its limits."*|
+|Understand the cost of performance.|**Prompt**: *"Which cost levers do I have for a Managed Instance with spiky CPU usage, for example vCores, service tier, instance pools and reservations?"*|
+|Find workload isolation options.|**Prompt**: *"We have OLTP and reporting workloads on the same instance. Which options do I have to prevent the reports from slowing down the transactions?"*|
+
+## 8.8 Using Copilot responsibly
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Know the limits of the answer.|**Prompt**: *"What are you not able to see or verify in my environment? Which conclusions of your last answer need to be confirmed with the Query Store or the Azure Portal?"*|
+|Test before production.|**Prompt**: *"How should I test the index change that you suggested before I apply it in production? Include the rollback script."*|
+|Document the analysis.|**Prompt**: *"Summarize our analysis as an incident report: symptom, impact, root cause, fix, verification and preventive actions."*|
+|Teach the next colleague.|**Prompt**: *"Create a short troubleshooting guide with the steps we used today so that a colleague can repeat the analysis with the DMVs and the Query Store."*|
+
 # Prompt cheat sheet
 
 | Goal | Example prompt |
@@ -172,3 +279,13 @@ We have seen how GitHub Copilot can help us analyze and mitigate performance iss
 | Write KQL | *"Write a KQL query for the AzureDiagnostics table that shows the average CPU percentage of my SQL Managed Instance over the last 2 hours."* |
 | Fix safely | *"Suggest how to optimize this stored procedure. Explain the root cause and show me the scripts, but do not execute anything."* |
 | Verify the fix | *"How can I verify that the CPU load has improved after creating the index?"* |
+| Compare monitoring tools | *"Compare DMVs, Query Store, Azure Monitor metrics, Log Analytics and Extended Events by data source, retention and typical use case."* |
+| Find regressions | *"Show me queries in TenantCRM whose average duration got worse in the last 24 hours compared with the previous 7 days. Do not change anything."* |
+| Understand parameter sniffing | *"Why can the same stored procedure be fast for one parameter value and slow for another? Compare the options to fix it by effort and risk."* |
+| Read wait statistics | *"Give me a query that shows the top wait types of the connected instance without the harmless background waits and explain the result."* |
+| Check resource limits | *"Which resource limits apply to my Managed Instance and where do I see that I hit one of them?"* |
+| Judge index suggestions | *"Why should I not create all missing indexes? Show me unused and duplicate indexes in TenantCRM. Do not execute anything."* |
+| Find blocking | *"Show me the current blocking chains in TenantCRM including the head blocker and its SQL text."* |
+| Plan alerts | *"Which alerts should I configure for a Managed Instance? Suggest thresholds and explain them."* |
+| Tune or scale | *"When should I fix the query and when should I add vCores? Please give me a decision guide."* |
+| Document the analysis | *"Summarize our analysis as an incident report: symptom, impact, root cause, fix, verification and preventive actions."* |

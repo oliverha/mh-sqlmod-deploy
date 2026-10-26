@@ -25,6 +25,16 @@ In this challenge **GitHub Copilot is your security assistant**. You will start 
 
 [7. Fix the SQL injection vulnerability with GitHub Copilot](#7-fix-the-sql-injection-vulnerability-with-github-copilot)
 
+[8. Deepen your understanding with GitHub Copilot](#8-deepen-your-understanding-with-github-copilot)
+* [8.1 The security model and shared responsibility](#81-the-security-model-and-shared-responsibility)
+* [8.2 Authentication and authorization](#82-authentication-and-authorization)
+* [8.3 Protecting data](#83-protecting-data)
+* [8.4 Network security](#84-network-security)
+* [8.5 Auditing and threat detection](#85-auditing-and-threat-detection)
+* [8.6 Compliance and governance](#86-compliance-and-governance)
+* [8.7 Secure development](#87-secure-development)
+* [8.8 Incident response and recovery](#88-incident-response-and-recovery)
+
 [Prompt cheat sheet](#prompt-cheat-sheet)
 
 # 1. Introduction
@@ -182,6 +192,110 @@ In this section we close the loop. The simulated attack showed what a SQL inject
 
 We have seen how GitHub Copilot can help us analyze and mitigate security issues, and how the Azure security features help us to verify the results and to detect attacks.
 
+# 8. Deepen your understanding with GitHub Copilot
+
+This optional section contains additional prompts that help you to understand the bigger picture of security on Azure SQL Managed Instance. No screenshots are needed. Run the prompts in the Copilot chat of SSMS and ask follow-up questions.
+
+> **Tips**
+>
+> * Give Copilot your context: compliance requirements, types of data, who accesses the database and from where.
+> * Ask for **tables** when you compare features, and for **priorities** when you get long lists.
+> * Security features and defaults change. Ask Copilot to point to the **official documentation** and verify the details there.
+> * Never paste secrets, passwords, connection strings or real personal data into a prompt.
+> * Tell Copilot **not to execute** scripts that change permissions, keys or configuration.
+
+## 8.1 The security model and shared responsibility
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand the shared responsibility.|**Prompt**: *"Explain the shared responsibility model for Azure SQL Managed Instance. Which security tasks does Microsoft handle and which tasks remain with me?"*|
+|Compare with your legacy server.|**Prompt**: *"Which security tasks did I have to do on my legacy SQL Server on-premises that Azure SQL Managed Instance now does for me, for example patching, encryption and backups? What is new?"*|
+|Get a security checklist.|**Prompt**: *"Create a security baseline checklist for a new Azure SQL Managed Instance, grouped by network, identity, data protection, monitoring and governance."*|
+|Understand defense in depth.|**Prompt**: *"Explain defense in depth with an example attack path against a database and show which layer stops the attacker at which point."*|
+|Compare the targets.|**Prompt**: *"Compare the security features of Azure SQL Managed Instance, Azure SQL Database and SQL Server on an Azure VM in a table."*|
+
+## 8.2 Authentication and authorization
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Compare the authentication methods.|**Prompt**: *"Compare SQL authentication, Windows authentication, and Microsoft Entra authentication on Azure SQL Managed Instance. Which one do you recommend and why?"*|
+|Understand Entra-only authentication.|**Prompt**: *"What does Microsoft Entra-only authentication mean for Azure SQL Managed Instance, and what do I have to prepare before I enable it?"*|
+|Review the permissions.|**Prompt**: *"Show me a query that lists all users, roles and explicit permissions in TenantCRM, and highlight users with db_owner or other powerful permissions."*|
+|Apply least privilege.|**Prompt**: *"My application connects with a user that has db_owner. Which minimal permissions does an application normally need? Show me a script for a restricted role, but do not execute it."*|
+|Use managed identities.|**Prompt**: *"How can my application connect to the Managed Instance without a password, using a managed identity? What are the benefits compared with a SQL login in the connection string?"*|
+|Understand roles at all levels.|**Prompt**: *"Explain the difference between Azure RBAC roles, server-level roles and database-level roles for Managed Instance. Who can do what?"*|
+|Find orphaned and stale accounts.|**Prompt**: *"How do I find orphaned users and accounts that have not been used for a long time? What should I do with them?"*|
+|Plan privileged access.|**Prompt**: *"How can I reduce standing administrator access, for example with Privileged Identity Management and just-in-time access?"*|
+
+## 8.3 Protecting data
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand Transparent Data Encryption.|**Prompt**: *"What does Transparent Data Encryption protect and what does it not protect? Is it enough to meet a requirement for encryption at rest?"*|
+|Compare the key options.|**Prompt**: *"Compare service-managed keys and customer-managed keys (Azure Key Vault) for TDE on Managed Instance. What are the risks if the key is lost or access is revoked?"*|
+|Understand Always Encrypted.|**Prompt**: *"Explain how Always Encrypted works, what the DBA can and cannot see, and which operations on encrypted columns are limited."*|
+|Compare the techniques.|**Prompt**: *"Create a table that compares Dynamic Data Masking, Always Encrypted, row-level security, TDE and column permissions by threat, performance impact and application changes."*|
+|Use Dynamic Data Masking.|**Prompt**: *"Show me how I could mask the columns FirstName and LastName with Dynamic Data Masking and which roles see the real data. Also tell me the weaknesses of masking. Do not execute anything."*<br>**Learn**: Masking is not a strong security boundary on its own.|
+|Use row-level security.|**Prompt**: *"Explain row-level security with a multi-tenant example. How can I make sure that a tenant only sees its own rows?"*|
+|Understand the ledger.|**Prompt**: *"What is the ledger feature in Azure SQL and in which cases would I use it?"*|
+|Protect backups.|**Prompt**: *"How are backups of a Managed Instance protected and who can restore them? How do I secure the long-term retention backups?"*|
+|Protect data in transit.|**Prompt**: *"Which TLS version is used for connections to Managed Instance and how do I enforce a minimum TLS version?"*|
+
+## 8.4 Network security
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand the network isolation.|**Prompt**: *"Explain how a Managed Instance is isolated in its subnet, and which network security group and route table rules are required and managed by the service."*|
+|Understand the public endpoint.|**Prompt**: *"What is the public endpoint of Azure SQL Managed Instance, when should I enable it, and how do I secure it if I must use it?"*|
+|Compare the connection options.|**Prompt**: *"Compare connecting to Managed Instance via VNet peering, private endpoint, VPN, ExpressRoute and public endpoint. Which one is the most secure and which one the most convenient?"*|
+|Understand the connection policy.|**Prompt**: *"What is the difference between the Proxy and Redirect connection policy and what do I have to open on the firewall for each?"*|
+|Control outbound traffic.|**Prompt**: *"How can I control outbound connectivity from my Managed Instance, for example to prevent data exfiltration?"*|
+|Review the network setup.|**Prompt**: *"Which questions should I ask to review the network security of our Managed Instance deployment?"*|
+
+## 8.5 Auditing and threat detection
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand auditing.|**Prompt**: *"Explain SQL Audit on Azure SQL Managed Instance. What can I log, where can the logs be stored and how do I analyze them?"*|
+|Choose the audit destination.|**Prompt**: *"Compare storage account, Log Analytics and Event Hubs as audit destinations by cost, query options and retention."*|
+|Find suspicious activity.|**Prompt**: *"Which signals in the audit logs point to a compromised account, for example failed logins, logins from new locations, permission changes or unusual data volumes? Write a KQL query for failed logins."*|
+|Understand the Defender plans.|**Prompt**: *"What does Microsoft Defender for SQL include? What is the difference between the vulnerability assessment and Advanced Threat Protection, and what does it cost?"*|
+|Understand the alert types.|**Prompt**: *"Which alert types can Advanced Threat Protection raise, and which of them are most important for a database with personal data?"*|
+|Handle false positives.|**Prompt**: *"An alert shows access from an unusual location. How do I decide whether it is an attack or a legitimate administrator, and how do I suppress known good activity?"*|
+|Build the monitoring concept.|**Prompt**: *"Create a simple security monitoring concept: which logs, which alerts, who is notified and how often are the findings reviewed?"*|
+
+## 8.6 Compliance and governance
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand the regulatory requirements.|**Prompt**: *"Which technical measures does GDPR require for a database with personal data, and which of them can I implement with Azure SQL features?"*|
+|Use Azure Policy.|**Prompt**: *"Which Azure Policy definitions help me to enforce a secure configuration of Managed Instances, for example auditing, minimum TLS and Entra-only authentication?"*|
+|Use Microsoft Defender for Cloud.|**Prompt**: *"How do the secure score and the recommendations in Microsoft Defender for Cloud relate to the findings of the Vulnerability Assessment?"*|
+|Understand the data lifecycle.|**Prompt**: *"How do I handle the right to erasure in a database with backups and long-term retention?"*|
+|Connect classification and governance.|**Prompt**: *"How can the sensitivity labels from Data Discovery & Classification be used for auditing and in Microsoft Purview?"*|
+|Prepare for an audit.|**Prompt**: *"Which evidence should I collect from Azure SQL Managed Instance for an auditor, for example configuration, access reviews and audit logs?"*|
+
+## 8.7 Secure development
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Understand SQL injection more broadly.|**Prompt**: *"Show me the most common SQL injection patterns in stored procedures and in application code, and how to prevent them. Use harmless examples only."*|
+|Review code.|**Prompt**: *"Review all stored procedures in TenantCRM that take string parameters for security problems other than SQL injection, for example missing permission checks, excessive EXECUTE AS or insecure error handling. Do not change anything."*|
+|Understand EXECUTE AS and ownership chaining.|**Prompt**: *"Explain EXECUTE AS and ownership chaining in stored procedures and how they can be used to give limited access to data."*|
+|Manage secrets.|**Prompt**: *"How should the application store its database connection information? Compare connection strings in a config file with Azure Key Vault and managed identities."*|
+|Use secure test data.|**Prompt**: *"How can I create test data from the TenantCRM database without exposing personal data?"*|
+|Automate checks.|**Prompt**: *"How can I add automated security checks for database code to a CI/CD pipeline?"*|
+
+## 8.8 Incident response and recovery
+
+|**Narrative**| **Prompt and what you should learn**|
+|:------------|:------------------------------------|
+|Respond to an alert.|**Prompt**: *"Defender raised a SQL injection alert. Create a step-by-step response plan: what do I check first, how do I contain the issue, and which evidence do I collect?"*|
+|Contain a compromised login.|**Prompt**: *"A login might be compromised. Which steps do I take on the Managed Instance, for example disabling the login, ending sessions and reviewing the audit logs? Show me the scripts, but do not execute anything."*|
+|Recover data.|**Prompt**: *"How can I restore a Managed Instance database to a point in time before a malicious change, and what are the effects on the application?"*|
+|Prepare for ransomware or deletion.|**Prompt**: *"Which protections prevent the loss of backups and data when an administrator account is compromised, for example immutable backups and resource locks?"*|
+|Learn from the incident.|**Prompt**: *"Create a post-incident review template with timeline, root cause, impact, corrective actions and the security controls we want to add."*|
+
 # Prompt cheat sheet
 
 | Goal | Example prompt |
@@ -196,3 +310,12 @@ We have seen how GitHub Copilot can help us analyze and mitigate security issues
 | Fix safely | *"Rewrite this stored procedure so that it is not vulnerable to SQL injection. Show me the script and explain the changes, but do not execute anything."* |
 | Verify the fix | *"Please give me a test script that calls the fixed procedure with a normal input and with an injection attempt."* |
 | Harden further | *"Which additional security measures should I implement for this database? Please prioritize them."* |
+| Review the permissions | *"Show me all users, roles and explicit permissions in TenantCRM and highlight users with powerful permissions."* |
+| Apply least privilege | *"Which minimal permissions does my application need? Show me a script for a restricted role, but do not execute it."* |
+| Compare protection features | *"Compare Dynamic Data Masking, Always Encrypted, row-level security, TDE and column permissions by threat and application changes."* |
+| Compare connection options | *"Compare VNet peering, private endpoint, VPN, ExpressRoute and public endpoint for Managed Instance by security and convenience."* |
+| Plan auditing | *"Explain SQL Audit on Managed Instance and compare the audit destinations by cost, query options and retention."* |
+| Find suspicious activity | *"Write a KQL query for failed logins and tell me which other audit signals point to a compromised account."* |
+| Check compliance | *"Which technical measures does GDPR require for a database with personal data, and which Azure SQL features support them?"* |
+| Respond to an incident | *"Create a step-by-step response plan for this alert: what do I check first, how do I contain it and which evidence do I collect?"* |
+| Share results safely | *"Replace all names, e-mail addresses and connection details in this result with placeholders so that I can share it."* |
