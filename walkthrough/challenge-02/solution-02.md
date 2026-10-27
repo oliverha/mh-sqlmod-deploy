@@ -160,6 +160,8 @@ We’ve now seen how the various performance monitoring and diagnosis tools – 
 
 In this exercise you will leverage GitHub Copilot to mitigate the performance issue.
 
+> **Important: Once you have found the solution, consult the trainers first. Do not make any changes to the database until you have discussed the solution with them.**
+
 |**Narrative/Instructions**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
 |Ask Copilot for a recommendation to fix the most expensive stored procedure. Ask for an explanation **and** for the script, but tell Copilot not to execute it.|![Copilot recommends a fix](../../Images/Copilot_Recommend_Fix.png)|**Prompt**: *"Please suggest how to optimize the most CPU consuming stored procedure in TenantCRM. Explain the root cause and show me the scripts, but do not execute anything."*|
