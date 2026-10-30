@@ -63,8 +63,8 @@ The labs run against the **\<Team\>_TenantDataDb** database that you migrated ea
 |**Narrative/Instructions**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
 |On your Team Win11 VM open **SQL Server Management Studio (SSMS)** and connect to the Azure SQL Managed Instance XXXXXX. **Authentication: Microsoft Entra MFA** **Login:** **<secret group="Azure" name="Entra ID Username" show="true"></secret>** **TAP:**  **<secret group="Azure" name="Entra ID TAP"></secret>**| **![](../../Images/Connect_SQLMI_00.png)**|If SSMS is not connected to your Azure and GitHub accounts anymore, repeat the account steps from [Challenge 1](../challenge-01/solution-01.md#12-connect-ssms-with-your-azure-and-github-copilot-accounts).|
-|In a browser open the Azure Portal (portal.azure.com) and sign in with the Azure credentials. Keep the portal open, you will need it in the next sections.|![PLACEHOLDER: Azure Portal signed in](../../Images/Add_Azure_Account_02.png)||
-|In Object Explorer expand **Databases**, right-click **TenantCRM** and select **New Query**. Make sure the query window is connected to **TenantCRM**.|![PLACEHOLDER: New query window on TenantCRM](../../Images/SSMS_TenantCRM_NewQuery.png)|Copilot uses the connection of the active query window as context.|
+|In a browser open the Azure Portal (portal.azure.com) and sign in with the Azure credentials. Keep the portal open, you will need it in the next sections.|![Azure Portal signed in](../../Images/Add_Azure_Account_02.png)||
+|In Object Explorer expand **Databases**, right-click **TenantCRM** and select **New Query**. Make sure the query window is connected to **TenantCRM**.|![New query window on TenantCRM](../../Images/SSMS_TenantCRM_NewQuery.png)|Copilot uses the connection of the active query window as context.|
 
 ## 2.3 Open the GitHub Copilot chat
 
