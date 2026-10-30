@@ -54,6 +54,17 @@ In this challenge **GitHub Copilot is your companion throughout the whole migrat
 
 Before you start with the migration, you need to prepare your lab environment. You will connect to the lab machine, link your Azure and GitHub Copilot accounts, and connect to both the legacy SQL Server and the Azure SQL Managed Instance.
 
+> ## ⚠️ WARNING - Only work with the databases of YOUR team!
+>
+> The legacy SQL Server and the Azure SQL Managed Instance are **shared with the other teams**. You will see the databases of all teams in Object Explorer.
+>
+> * 🚫 **Do NOT change, migrate, link, fail over, delete or otherwise touch databases of other teams.** This would break the challenge of the other team.
+> * 🆔 **Know your team name before you start!** Your team name starts with **LABUSER-XXXX** (for example *LABUSER-0001*). It is part of your Entra ID user name and of the names of your databases.
+> * ✅ **Before every action** (assessment, Managed Instance Link, failover, scripts) check that the selected databases carry **your** team name.
+> * 🤖 **Review every Copilot proposal** (especially generated T-SQL scripts) for database names of other teams before you execute it.
+>
+> **If you are not sure what your team name is, ask your coach before you continue.**
+
 ## 1.1 Connect to your Win11 VM
 
 |**Narrative**| **Screenshot**| **Notes**|
@@ -82,7 +93,7 @@ You need two accounts in SSMS: your **Azure account** (to select the Managed Ins
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
 |In the **Connect to Server** dialog connect to **legacySQL2016**. Use **Windows Authentication** and check the **Trust server certificate** checkbox.|![Connect to legacySQL2016](../../Images/Connect_legacy_SQL_00.png)||
-|In Object Explorer expand the **Databases** node. You should see the databases of your team.|![legacySQL2016 databases in Object Explorer](../../Images/Connect_legacy_SQL_01.png)|Only work with the databases of your team.|
+|In Object Explorer expand the **Databases** node. You should see the databases of your team.|![legacySQL2016 databases in Object Explorer](../../Images/Connect_legacy_SQL_01.png)|**⚠️ WARNING: Only work with the databases of your team (LABUSER-XXXX). Do NOT change the databases of other teams!**|
 
 ## 1.4 Connect to the Azure SQL Managed Instance
 
@@ -142,9 +153,9 @@ In this section we will use SQL Server Management Studio (SSMS) to migrate the a
 |:------------|:--------------|:---------|
 |Ask Copilot what Managed Instance Link is and how the migration with minimal downtime works.|![Copilot explains Managed Instance Link](../../Images/What_is_MILink.png)|**Prompt**: *"How does the migration with Managed Instance Link work and what are the steps for the cut-over?"*|
 |On the central migration experience in SSMS you can now select **Migrate Data** and select the option **Managed Instance Link**.|![](../../Images/Migrate_with_MI_Link.png)| **Note**: Managed Instance Link offers the option for a migration with minimal downtime. You create the Managed Instance Link first. Then you wait until the databases are synchronized. And finally you do the cut-over.|
-|On the first screen of the Managed Instance Link Wizard please provide your team name to better distinguish between the migration objects.|![](../../Images/MILink-Wizard01.png)||
+|On the first screen of the Managed Instance Link Wizard please provide your team name (**LABUSER-XXXX**) to better distinguish between the migration objects.|![](../../Images/MILink-Wizard01.png)|**⚠️ WARNING**: Use exactly your own team name. Do not use or change the migration objects of other teams.|
 |The Managed Instance Link will check for MI Link readiness of the instance.|![](../../Images/MILink-Wizard02.png)|**Note**: The mentioned Trace Flags will make sure that the migration performance is good enough during the migration. The requirements and limitations for Managed Instance Link are listed here [https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/managed-instance-link-feature-overview?view=azuresql#limitations](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/managed-instance-link-feature-overview?view=azuresql#limitations).<br>**Prompt**: *"The Managed Instance Link readiness check shows trace flags. What do they do and do I have to change anything?"*|
-|Select only the databases of your team. The databases can only be connected to one MI Link.|![](../../Images/MILink-Wizard03.png)||
+|Select only the databases of your team. The databases can only be connected to one MI Link.|![](../../Images/MILink-Wizard03.png)|**⚠️ WARNING**: Select ONLY databases that belong to your team (**LABUSER-XXXX**). Never select databases of other teams.|
 |Next add the SQL Managed Instance as a secondary replica.|![](../../Images/MILink-Wizard04.png)||
 |You need to connect to Azure to select the SQL Managed Instance resource. In addition you need to connect to the Managed Instance itself.|![](../../Images/MILink-Wizard05.png)|**Note**: The credentials are provided during the Hack. You already connected both accounts in the preparation section.|
 |The Wizard connects to the Managed Instance and checks the Managed Instance for compatibility. Click **Next**.|![](../../Images/MILink-Wizard06.png)||
