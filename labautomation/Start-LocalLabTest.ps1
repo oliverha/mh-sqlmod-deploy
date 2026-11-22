@@ -103,7 +103,8 @@ function Connect-LocalGraph {
         Disconnect-MgGraph -ErrorAction Stop | Out-Null
     }
     Connect-MgGraph -TenantId $TenantId -UseDeviceCode -NoWelcome -ContextScope Process -Scopes $Scopes
-    Write-Host "    Graph verbunden als $((Get-MgContext).Account)" -ForegroundColor Green
+    $graphUser = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=userPrincipalName').userPrincipalName
+    Write-Host "    Graph verbunden als $graphUser" -ForegroundColor Green
 }
 
 function Get-GraphScopes {
@@ -119,23 +120,29 @@ function Get-GraphScopes {
 
 # Prüft, ob der angemeldete User die Rolle Global Administrator aktuell aktiv hat (direkt oder per Gruppe).
 # Bei PIM zählt nur eine aktivierte Rolle, eine "eligible" Zuweisung genügt nicht.
-function Test-GlobalAdminActive {
+function Get-GlobalAdminStatus {
     $globalAdminRoleId = '62e90394-69f5-4237-9190-012177145e10'
-    $meId = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=id').id
+    $me = Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=id,userPrincipalName'
+    $status = [pscustomobject]@{ User = $me.userPrincipalName; Source = ''; ActiveRoles = @(); IsGlobalAdmin = $false }
 
     # Aktivierte Rollen (auch per PIM oder Rollen-Gruppe) erscheinen als directoryRole in transitiveMemberOf
     try {
-        $roles = @((Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.directoryRole?$select=id,roleTemplateId').value)
-        return (@($roles | Where-Object { $_.roleTemplateId -eq $globalAdminRoleId }).Count -gt 0)
+        $roles = @((Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.directoryRole?$select=id,roleTemplateId,displayName').value)
+        $status.Source = 'transitiveMemberOf'
+        $status.ActiveRoles = @($roles | ForEach-Object { $_.displayName })
+        $status.IsGlobalAdmin = @($roles | Where-Object { $_.roleTemplateId -eq $globalAdminRoleId }).Count -gt 0
+        return $status
     }
     catch {
         Write-Host "    transitiveMemberOf nicht abrufbar ($($_.Exception.Message)), prüfe direkte Rollenzuweisungen." -ForegroundColor Yellow
     }
 
     # Fallback: direkte aktive Rollenzuweisungen
-    $filter = [uri]::EscapeDataString("principalId eq '$meId' and roleDefinitionId eq '$globalAdminRoleId'")
+    $filter = [uri]::EscapeDataString("principalId eq '$($me.id)' and roleDefinitionId eq '$globalAdminRoleId'")
     $assignments = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?`$filter=$filter").value)
-    $assignments.Count -gt 0
+    $status.Source = 'roleAssignments'
+    $status.IsGlobalAdmin = $assignments.Count -gt 0
+    $status
 }
 
 # Prüft, ob die TAP-Policy des Tenants TAPs mit der gewünschten Laufzeit erlaubt. Gibt $true zurück, wenn ja.
@@ -296,8 +303,11 @@ if (-not $SkipGraphLogin) {
 
     if (-not $SkipGlobalAdminCheck) {
         Write-Step 'Prüfe, ob die Rolle Global Administrator aktiviert ist'
-        if (-not (Test-GlobalAdminActive)) {
-            throw "Die Rolle 'Global Administrator' ist für $((Get-MgContext).Account) nicht aktiv. Bitte zuerst in PIM aktivieren und das Skript neu starten (mit -SkipGlobalAdminCheck kann die Prüfung übersprungen werden)."
+        $adminStatus = Get-GlobalAdminStatus
+        Write-Host "    Angemeldet als:  $($adminStatus.User)"
+        Write-Host "    Aktive Rollen:   $(if ($adminStatus.ActiveRoles.Count -gt 0) { $adminStatus.ActiveRoles -join ', ' } else { '(keine ermittelt)' })  [Quelle: $($adminStatus.Source)]"
+        if (-not $adminStatus.IsGlobalAdmin) {
+            throw "Die Rolle 'Global Administrator' ist für '$($adminStatus.User)' nicht aktiv. Bitte zuerst in PIM aktivieren (danach ggf. 1-2 Minuten warten) und das Skript neu starten. Mit -SkipGlobalAdminCheck kann die Prüfung übersprungen werden."
         }
         Write-Host '    Global Administrator ist aktiv.' -ForegroundColor Green
     }
