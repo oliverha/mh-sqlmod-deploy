@@ -83,6 +83,9 @@ param(
     # Nur Graph-Login und Prüfung der TAP-Policy; es wird nichts angelegt oder deployt
     [switch]$CheckTapPolicyOnly,
 
+    # Überspringt die Prüfung, ob die Global-Administrator-Rolle aktiviert ist (z. B. bei anderen ausreichenden Rollen)
+    [switch]$SkipGlobalAdminCheck,
+
     # Datei, in die die Testuser mit TAP geschrieben werden (enthält Geheimnisse, per .gitignore ausgenommen)
     [string]$TapOutputFile = (Join-Path $PSScriptRoot 'local-lab-taps.csv')
 )
@@ -105,13 +108,23 @@ function Connect-LocalGraph {
 
 function Get-GraphScopes {
     $policyScope = if ($UpdateTapPolicy) { 'Policy.ReadWrite.AuthenticationMethod' } else { 'Policy.Read.All' }
-    if ($CheckTapPolicyOnly) { return @($policyScope) }
+    if ($CheckTapPolicyOnly) { return @($policyScope, 'RoleManagement.Read.Directory') }
 
     $scopes = @('Application.Read.All', 'RoleManagement.ReadWrite.Directory')
     if ($LabUserCount -gt 0) {
         $scopes += 'User.ReadWrite.All', 'UserAuthenticationMethod.ReadWrite.All', 'Domain.Read.All', $policyScope
     }
     $scopes
+}
+
+# Prüft, ob der angemeldete User die Rolle Global Administrator aktuell aktiv hat (direkt oder per Gruppe).
+# Bei PIM zählt nur eine aktivierte Rolle, eine "eligible" Zuweisung genügt nicht.
+function Test-GlobalAdminActive {
+    $globalAdminRoleId = '62e90394-69f5-4237-9190-012177145e10'
+    $meId = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=id').id
+    $filter = [uri]::EscapeDataString("principalId eq '$meId' and roleDefinitionId eq '$globalAdminRoleId'")
+    $assignments = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/roleManagement/directory/transitiveRoleAssignments?`$filter=$filter").value)
+    $assignments.Count -gt 0
 }
 
 # Prüft, ob die TAP-Policy des Tenants TAPs mit der gewünschten Laufzeit erlaubt. Gibt $true zurück, wenn ja.
@@ -254,18 +267,36 @@ function Show-HackboxCredentials {
 }
 
 # ---------------------------------------------------------------------------
-# 0) Prüfungen und optional nur TAP-Policy prüfen
+# 0) Prüfungen, Graph-Login und Global-Administrator-Check (bricht sofort ab, wenn die Rolle nicht aktiv ist)
 # ---------------------------------------------------------------------------
 if ($LabUserCount -gt 0 -and $SkipGraphLogin) {
     throw '-LabUserCount benötigt den Graph-Login, -SkipGraphLogin kann nicht verwendet werden.'
+}
+if ($CheckTapPolicyOnly -and $SkipGraphLogin) {
+    throw '-CheckTapPolicyOnly benötigt den Graph-Login, -SkipGraphLogin kann nicht verwendet werden.'
 }
 if ($LabUserCount -gt 0 -and ($FirstLabUserNumber + $LabUserCount - 1) -gt 9999) {
     throw "Die Testuser-Nummern würden 9999 überschreiten ($FirstLabUserNumber + $LabUserCount - 1)."
 }
 
-if ($CheckTapPolicyOnly) {
-    Write-Step 'Graph-Anmeldung und Prüfung der TAP-Policy'
+if (-not $SkipGraphLogin) {
+    Write-Step 'Anmeldung Microsoft Graph (Device Code)'
     Connect-LocalGraph -Scopes (Get-GraphScopes)
+
+    if (-not $SkipGlobalAdminCheck) {
+        Write-Step 'Prüfe, ob die Rolle Global Administrator aktiviert ist'
+        if (-not (Test-GlobalAdminActive)) {
+            throw "Die Rolle 'Global Administrator' ist für $((Get-MgContext).Account) nicht aktiv. Bitte zuerst in PIM aktivieren und das Skript neu starten (mit -SkipGlobalAdminCheck kann die Prüfung übersprungen werden)."
+        }
+        Write-Host '    Global Administrator ist aktiv.' -ForegroundColor Green
+    }
+}
+elseif (-not $SkipGlobalAdminCheck) {
+    Write-Warning 'Mit -SkipGraphLogin kann die Global-Administrator-Rolle nicht geprüft werden.'
+}
+
+if ($CheckTapPolicyOnly) {
+    Write-Step 'Prüfung der TAP-Policy'
     $tapAllowed = Test-TapPolicy
     if (-not $tapAllowed) { Write-Warning "TAPs mit $TapLifetimeMinutes Minuten Laufzeit sind aktuell nicht erlaubt." }
     return
@@ -320,13 +351,8 @@ az account set --subscription $SubscriptionId
 if ($LASTEXITCODE -ne 0) { throw 'az account set fehlgeschlagen.' }
 
 # ---------------------------------------------------------------------------
-# 4) Microsoft Graph (für Directory Readers der SQL MI)
+# 4) Microsoft Graph: Login erfolgt bereits in Schritt 0
 # ---------------------------------------------------------------------------
-if (-not $SkipGraphLogin) {
-    Write-Step 'Anmeldung Microsoft Graph (Device Code)'
-    Connect-LocalGraph -Scopes (Get-GraphScopes)
-}
-
 # ---------------------------------------------------------------------------
 # 4b) Optional: lokale Entra-ID-Testuser LABUSER-0001 ... anlegen
 # ---------------------------------------------------------------------------
@@ -421,6 +447,13 @@ else {
 # 8) TAPs für die Testuser (erst jetzt, damit die Laufzeit nach dem Deployment beginnt)
 # ---------------------------------------------------------------------------
 if ($labUsers.Count -gt 0) {
+    # Das Shared-Deployment ersetzt die Graph-Sitzung durch ein Az-Token (ohne die benötigten Scopes), und das Token ist nach den Deployments abgelaufen
+    $graphContext = Get-MgContext
+    if (-not $graphContext -or $graphContext.AuthType -eq 'UserProvidedAccessToken' -or $graphContext.Scopes -notcontains 'UserAuthenticationMethod.ReadWrite.All') {
+        Write-Step 'Anmeldung Microsoft Graph für die TAPs (Device Code)'
+        Connect-LocalGraph -Scopes (Get-GraphScopes)
+    }
+
     Write-Step "Temporary Access Pass ($TapLifetimeMinutes Minuten) für $($labUsers.Count) Testuser erstellen"
     $taps = @($labUsers | ForEach-Object { New-LocalLabTap -User $_ })
 
