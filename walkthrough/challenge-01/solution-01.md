@@ -15,7 +15,7 @@ In this challenge **GitHub Copilot is your companion throughout the whole migrat
 [1. Preparation](#1-preparation)
 * [1.1 Connect to your Win11 VM](#11-connect-to-your-win11-vm)
 * [1.2 Connect SSMS with your Azure and GitHub Copilot accounts](#12-connect-ssms-with-your-azure-and-github-copilot-accounts)
-* [1.3 Connect to the legacy SQL Server](#13-connect-to-the-legacy-sql-server)
+* [1.3 Connect to the local SQL Server](#13-connect-to-the-local-sql-server)
 * [1.4 Connect to the Azure SQL Managed Instance](#14-connect-to-the-azure-sql-managed-instance)
 * [1.5 Say hello to GitHub Copilot](#15-say-hello-to-github-copilot)
 
@@ -52,11 +52,11 @@ In this challenge **GitHub Copilot is your companion throughout the whole migrat
 
 # 1. Preparation
 
-Before you start with the migration, you need to prepare your lab environment. You will connect to the lab machine, link your Azure and GitHub Copilot accounts, and connect to both the legacy SQL Server and the Azure SQL Managed Instance.
+Before you start with the migration, you need to prepare your lab environment. You will connect to the lab machine, link your Azure and GitHub Copilot accounts, and connect to both the local SQL Server and the Azure SQL Managed Instance.
 
 > ## ⚠️ WARNING - Only work with the databases of YOUR team!
 >
-> The legacy SQL Server and the Azure SQL Managed Instance are **shared with the other teams**. You will see the databases of all teams in Object Explorer.
+> The Azure SQL Managed Instance is **shared with the other teams**. You will see the databases of all teams in Object Explorer of the Managed Instance.
 >
 > * 🚫 **Do NOT change, migrate, link, fail over, delete or otherwise touch databases of other teams.** This would break the challenge of the other team.
 > * 🆔 **Know your team name before you start!** Your team name starts with **LABUSER-XXXX** (for example *LABUSER-0001*). It is part of your Entra ID user name and of the names of your databases.
@@ -88,12 +88,12 @@ You need two accounts in SSMS: your **Azure account** (to select the Managed Ins
 |Allow the website to open SQL Server Management Studio.|![](../../Images/Allow_to_open_SSMS.png)||
 |GitHub is now connected with SSMS. You can now use the Copilot chat window.|![](../../Images/SSMS_Github_Chat.png)||
 
-## 1.3 Connect to the legacy SQL Server
+## 1.3 Connect to the local SQL Server
 
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|In the **Connect to Server** dialog connect to **legacySQL2016**. Use **Windows Authentication** and check the **Trust server certificate** checkbox.|![Connect to legacySQL2016](../../Images/Connect_legacy_SQL_00.png)||
-|In Object Explorer expand the **Databases** node. You should see the databases of your team.|![legacySQL2016 databases in Object Explorer](../../Images/Connect_legacy_SQL_01.png)|**⚠️ WARNING: Only work with the databases of your team (LABUSER-XXXX). Do NOT change the databases of other teams!**|
+|In the **Connect to Server** dialog connect to **localhost** (SQL Server 2017 on your team VM). Use **Windows Authentication** and check the **Trust server certificate** checkbox.|![Connect to the local SQL Server](../../Images/Connect_legacy_SQL_00.png)||
+|In Object Explorer expand the **Databases** node. You should see the databases of your team.|![Local SQL Server databases in Object Explorer](../../Images/Connect_legacy_SQL_01.png)|**⚠️ WARNING: Only work with the databases of your team (LABUSER-XXXX). Do NOT change the databases of other teams!**|
 
 ## 1.4 Connect to the Azure SQL Managed Instance
 
@@ -120,7 +120,7 @@ In this section we will use SQL Server Management Studio to assess the SQL Serve
 |:------------|:--------------|:---------|
 |Ask Copilot how the migration works.|![Copilot explains the migration path](../../Images/How_can_i_migrate_a_database_to_sqlmi.png)|**Prompt**: *"How can I migrate my database from SQL Server to a Managed Instance?"*|
 |Ask Copilot what the migration assessment does before you run it.|![Copilot explains the migration assessment](../../Images/What_happens_during_the_migration_assessment.png)|**Prompt**: *"What exactly happens during the migration assessment?"*|
-|We need to determine the suitability of the database(s) for migration to Azure. This includes checking for compatibility and feature support with Azure SQL. From the context menu of the **legacySQL2016** instance select **Migrate SQL Server**.|![Migrate SQL Server](../../Images/Migrate%20SQL%20Server.png)|If the context menu is not visible the Hybrid and Migration workload was not installed with SSMS.|
+|We need to determine the suitability of the database(s) for migration to Azure. This includes checking for compatibility and feature support with Azure SQL. From the context menu of the **localhost** instance select **Migrate SQL Server**.|![Migrate SQL Server](../../Images/Migrate%20SQL%20Server.png)|If the context menu is not visible the Hybrid and Migration workload was not installed with SSMS.|
 |This opens the main screen for the migration experience.|![Migrate SQL Server](../../Images/Migrate%20Screen.png)||
 |Click **Run Readiness Assessment**.|![](../../Images/Run%20Readiness%20Assessment.png)|The assessment will take some seconds to minutes depending on the number of databases and the amount of database objects.|
 |After the assessment completes we will see that only SQL Server on Azure Virtual Machine is available as a possible migration target.|![](../../Images/AssessmentResult01.png)||

@@ -4,7 +4,6 @@ param managedInstanceServer string
 param storageAccountName string
 param vmName string
 param TeamName string = 'TEAM01'
-param legacySQLName string
 param adminUsername string
 @secure()
 param adminPassword string
@@ -17,7 +16,7 @@ param SqlMiSysadminUser string
 
 
 //var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamNumber ##teamNumber##'
-var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamName ${TeamName} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}" -BackupBaseUri "${repoBaseURL}/Databases" -ServerInstance "${legacySQLName}" -adminUsername "${adminUsername}" -adminPassword "${adminPassword}" -sqlMiAdminUsername "${sqlMiAdminUsername}" -sqlMiAdminPassword "${sqlMiAdminPassword}" -SqlMiSysadminUser "${SqlMiSysadminUser}"'
+var ConfigureTeamVMCommand = 'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "bootstrap-teamvm.ps1" -SamplesBaseUri "${repoBaseURL}/TSQL_Scripts" -WallpaperUri "${repoBaseURL}/assets/BaseWallpaper.jpg" -TeamName ${TeamName} -LabsBaseUri "${repoBaseURL}/LABS" -ManagedInstanceServer "${managedInstanceServer}" -StorageAccountName "${storageAccountName}" -BackupBaseUri "${repoBaseURL}/Databases" -adminUsername "${adminUsername}" -adminPassword "${adminPassword}" -sqlMiAdminUsername "${sqlMiAdminUsername}" -sqlMiAdminPassword "${sqlMiAdminPassword}" -SqlMiSysadminUser "${SqlMiSysadminUser}"'
 resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' existing = {
   name: vmName
 }
@@ -40,8 +39,12 @@ resource ConfigureTeamMachine 'Microsoft.Compute/virtualMachines/extensions@2024
         '${repoBaseURL}/scripts/bootstrap-teamvm.ps1'
         '${repoBaseURL}/scripts/Configure-Teams-Shortcuts.ps1'
         '${repoBaseURL}/scripts/Configure-TeamVM.ps1'
+        '${repoBaseURL}/scripts/Install-SqlServer2017.ps1'
+        '${repoBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
+        '${repoBaseURL}/scripts/Download-TeamDatabases.ps1'
+        '${repoBaseURL}/scripts/Configure-LocalSQL.ps1'
         '${repoBaseURL}/scripts/Restore-TeamDatabases.ps1'
-        '${repoBaseURL}/scripts/Configure-legacySQL-DB.ps1'
+        '${repoBaseURL}/scripts/Configure-LocalSQL-DB.ps1'
         '${repoBaseURL}/scripts/Configure-SQLMI-Sysadmins.ps1'
         '${repoBaseURL}/scripts/Download-Labs.ps1'
         '${repoBaseURL}/scripts/Configure-TeamWallpaper.ps1'

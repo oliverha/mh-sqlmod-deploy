@@ -68,8 +68,38 @@ $adminUsername = "DemoUser"
 $adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 $sqlMiAdminUsername = "DemoUser"
 $sqlMiAdminPassword = New-MhhStablePassword -Purpose 'sqlmi-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
-$legacySQLName = "legacySQL2016"
 $arcSQLName = "arcSQL2022"
+$sharedDatabases = @("LocalMasterDataDB.bak", "SharedMasterDataDB.bak", "TenantDataDB.bak", "GlobalDataDB.bak", "TenantCRM.bak")
+$backupContainerName = "backups"
+
+# The managed instance is only reachable from inside the virtual network. T-SQL against it is therefore run on a VM
+# of the shared resource group via Azure Run Command. The script must end with SCRIPT_RESULT=Success.
+function Invoke-SharedVmScript {
+    param(
+        [Parameter(Mandatory)][string]$VmName,
+        [Parameter(Mandatory)][string]$ScriptPath,
+        [Parameter(Mandatory)][hashtable]$Parameter
+    )
+
+    $maxAttempts = 5
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            Write-Host "Running $(Split-Path -Leaf $ScriptPath) on $VmName (attempt $attempt/$maxAttempts)..."
+            $runResult = Invoke-AzVMRunCommand -ResourceGroupName $sharedResourceGroup -VMName $VmName -CommandId 'RunPowerShellScript' -ScriptPath $ScriptPath -Parameter $Parameter -ErrorAction Stop
+            $output = ($runResult.Value | ForEach-Object { $_.Message }) -join [Environment]::NewLine
+            Write-Host $output
+            if ($output -notmatch 'SCRIPT_RESULT=Success') {
+                throw "$(Split-Path -Leaf $ScriptPath) did not finish successfully."
+            }
+            return
+        }
+        catch {
+            if ($attempt -eq $maxAttempts) { throw }
+            Write-Host "Run command failed: $($_.Exception.Message). Retrying in 60 seconds..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 60
+        }
+    }
+}
 
 
 # deploy shared resources in the shared resource group (do not forget to assign the correct rbac roles to the allowed Entra users)
@@ -100,7 +130,6 @@ if ($SkipSharedDeployment) {
     $managedInstanceName = $managedInstance.ManagedInstanceName
     $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 
-    @{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'; group = 'Lab-General'}}
     @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'; group = 'Lab-General'}}
     @{"HackboxCredential" = @{name = 'Arc SQL Server Name'; value = $arcSQLName; note = 'Name of new SQL Server'; group = 'Lab-General'}}
 
@@ -134,7 +163,6 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         adminPassword                       = $adminPassword
         sqlMiAdminUsername                  = $sqlMiAdminUsername
         sqlMiAdminPassword                  = $sqlMiAdminPassword
-        legacySQLName                       = $legacySQLName
         arcSQLName                          = $arcSQLName
     }
 
@@ -148,7 +176,6 @@ $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -Er
 $managedInstanceName = $managedInstance.ManagedInstanceName
 $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 
-@{"HackboxCredential" = @{name = 'Legacy SQL Server Name'; value = $legacySQLName; note = 'Name of legacy SQL Server'; group = 'Lab-General'}}
 @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'; group = 'Lab-General'}}
 @{"HackboxCredential" = @{name = 'Arc SQL Server Name'; value = $arcSQLName; note = 'Name of new SQL Server'; group = 'Lab-General'}}
 
@@ -156,6 +183,45 @@ $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 @{"HackboxCredential" = @{name = 'VM User Password'; value = $adminPassword; note = 'Password to connect to every VM'; group = 'Lab-Credentials'}}
 @{"HackboxCredential" = @{name = 'SQLMI User Name'; value = $sqlMiAdminUsername; note = 'Username to connect to SQLMI'; group = 'Lab-Credentials'}}
 @{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $sqlMiAdminPassword; note = 'Password to connect to SQLMI'; group = 'Lab-Credentials'}}
+
+#Restore the shared databases and configure the SQLMI (the SQL Server 2016 legacy VM is replaced by SQL Server 2017 on every team VM)
+Write-Host "Uploading database backups to the storage account..."
+$storageAccountName = (Get-AzStorageAccount -ResourceGroupName $sharedResourceGroup -ErrorAction Stop | Select-Object -First 1).StorageAccountName
+$storageKey = (Get-AzStorageAccountKey -ResourceGroupName $sharedResourceGroup -Name $storageAccountName -ErrorAction Stop)[0].Value
+$storageContext = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageKey
+
+$downloadDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "mh-sqlmod-databases"
+New-Item -ItemType Directory -Path $downloadDirectory -Force | Out-Null
+
+# Fallback download URL: the repoBaseURL default of main-shared.bicep, so the URL is maintained in the Bicep files only
+$repoBaseURL = $null
+$repoBaseUrlMatch = Select-String -Path $template -Pattern "^\s*param\s+repoBaseURL\s+string\s*=\s*'([^']+)'" | Select-Object -First 1
+if ($repoBaseUrlMatch) { $repoBaseURL = $repoBaseUrlMatch.Matches[0].Groups[1].Value.TrimEnd('/') }
+
+foreach ($backupFile in $sharedDatabases) {
+    $localFile = Join-Path (Join-Path $scriptPath "Databases") $backupFile
+    if (-not (Test-Path -LiteralPath $localFile)) {
+        if (-not $repoBaseURL) { throw "Backup $backupFile not found in $scriptPath\Databases and no repoBaseURL default found in $template." }
+        $localFile = Join-Path $downloadDirectory $backupFile
+        Write-Host "Downloading $backupFile from $repoBaseURL ..."
+        Invoke-WebRequest -Uri "$repoBaseURL/Databases/$backupFile" -OutFile $localFile -UseBasicParsing -ErrorAction Stop
+    }
+    Write-Host "Uploading $backupFile ..."
+    Set-AzStorageBlobContent -File $localFile -Container $backupContainerName -Blob $backupFile -Context $storageContext -Force -ErrorAction Stop | Out-Null
+}
+Remove-Item -LiteralPath $downloadDirectory -Recurse -Force -ErrorAction SilentlyContinue
+
+Invoke-SharedVmScript -VmName $arcSQLName -ScriptPath (Join-Path $scriptPath "scripts\Restore-MIDatabases.ps1") -Parameter @{
+    StorageAccountName    = $storageAccountName
+    ManagedInstanceServer = $managedInstanceFQDN
+    sqlusername           = $sqlMiAdminUsername
+    sqlpassword           = $sqlMiAdminPassword
+}
+Invoke-SharedVmScript -VmName $arcSQLName -ScriptPath (Join-Path $scriptPath "scripts\Configure-SQLMI.ps1") -Parameter @{
+    ManagedInstanceServer = $managedInstanceFQDN
+    sqlusername           = $sqlMiAdminUsername
+    sqlpassword           = $sqlMiAdminPassword
+}
 
 [string]$managedInstanceResourceId = $managedInstance.Id
 #$managedInstancePrincipalId = $managedInstance.Identity.PrincipalId

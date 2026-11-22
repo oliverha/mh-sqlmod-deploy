@@ -10,7 +10,6 @@ param(
     [string]$TeamName,
     [string]$ManagedInstanceServer,
     [string]$StorageAccountName,
-    [string]$ServerInstance,
     [string]$SqlMiSysadminUser
 )
 
@@ -28,11 +27,23 @@ Write-Host "Configure Team VM (Privacy Experience / OOBE Privacy Consent Page) .
 Write-Host "Configure Team Wallpaper..."
 & .\Configure-TeamWallpaper.ps1 -WallpaperUri $WallpaperUri -TeamName $TeamName
 
+Write-Host "Installing SQL Server 2017 Developer Edition..."
+& .\Install-SqlServer2017.ps1 -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
+
+Write-Host "Configuring SQL Firewall..."
+& .\Set-FW-ForAllInstances.ps1
+
+Write-Host "Downloading Team Databases..."
+& .\Download-TeamDatabases.ps1 -BackupBaseUri $BackupBaseUri
+
+Write-Host "Configuring local SQL Server..."
+& .\Configure-LocalSQL.ps1 -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
+
 Write-Host "Restoring Team Databases..."
-& .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword -ServerInstance $ServerInstance
+& .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
 
 Write-Host "Configuring Team Databases..."
-& .\Configure-legacySQL-DB.ps1 -TeamName $TeamName -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword -ServerInstance $ServerInstance
+& .\Configure-LocalSQL-DB.ps1 -TeamName $TeamName -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
 
 Write-Host "Configuring SQL MI Sysadmins..."
 & .\Configure-SQLMI-Sysadmins.ps1 -ManagedInstanceServer $ManagedInstanceServer -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword -sqlMiSysadminUser $SqlMiSysadminUser

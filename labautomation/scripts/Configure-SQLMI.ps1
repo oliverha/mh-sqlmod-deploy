@@ -469,48 +469,49 @@ AS
 GO
 "@
 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.ConnectionInfo") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo") | Out-Null
-
 $connectionString = "Data Source=$ManagedInstanceServer;Initial Catalog=master;TrustServerCertificate=True;"
 $Connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
 [System.Security.SecureString]$SQLPwd = $sqlpassword | ConvertTo-SecureString -AsPlainText -Force
 $SQLPwd.MakeReadOnly()
 $cred = New-Object System.Data.SqlClient.SqlCredential($sqlusername,$SQLPwd)
 $Connection.credential = $cred
-#$Connection.open()
-
-#$command = New-Object system.Data.SqlClient.SqlCommand($Connection)
-#$command.Connection = $Connection
-#$command.CommandTimeout = $QueryTimeout
-
-#$command.CommandText = $ConfigureSql
-#$result = $command.ExecuteReader()
-#$table = New-Object System.Data.DataTable
-#$table.Load($result)
-
-# 5. SMO-Serververbindung initialisieren
-$serverConnection = New-Object Microsoft.SqlServer.Management.Common.ServerConnection($Connection)
-$server = New-Object Microsoft.SqlServer.Management.Smo.Server($serverConnection)
 
 try {
-    # Ausführung des Skripts inkl. GO-Trenner
-    [void]$server.ConnectionContext.ExecuteNonQuery($ConfigureSql)
-    #Write-Host "Skript erfolgreich auf SQL MI ausgeführt." -ForegroundColor Green
+    $Connection.Open()
+
+    # GO is a client-side batch separator (SMO is not available on every VM), so the script is split into batches on one connection.
+    # A GO line inside a multi-line string literal (e.g. a job step) is not a separator.
+    $batches = New-Object System.Collections.Generic.List[string]
+    $currentBatch = New-Object System.Text.StringBuilder
+    $inString = $false
+    foreach ($line in ($ConfigureSql -split "\r?\n")) {
+        if (-not $inString -and $line -match '^\s*GO\s*$') {
+            $batches.Add($currentBatch.ToString())
+            [void]$currentBatch.Clear()
+            continue
+        }
+        [void]$currentBatch.AppendLine($line)
+        if (($line.Length - $line.Replace("'", '').Length) % 2 -eq 1) { $inString = -not $inString }
+    }
+    $batches.Add($currentBatch.ToString())
+
+    foreach ($batch in $batches) {
+        if ([string]::IsNullOrWhiteSpace($batch)) { continue }
+
+        $command = $Connection.CreateCommand()
+        $command.CommandText = $batch
+        $command.CommandTimeout = 0
+        [void]$command.ExecuteNonQuery()
+    }
 }
 catch {
     $ErrorString = $_ | format-list -force | Out-String
     Write-Error "ERR: $ErrorString"
 }
 finally {
-    if ($null -ne $serverConnection -and $serverConnection.IsOpen) {
-        $serverConnection.Disconnect()
-    }
+    $Connection.Dispose()
 }
-try {
-	$Connection.Close()
-}
-catch {
-}
+
+Write-Output 'SCRIPT_RESULT=Success'
 
 Stop-Transcript

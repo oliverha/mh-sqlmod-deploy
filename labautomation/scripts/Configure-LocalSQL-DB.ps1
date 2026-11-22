@@ -9,10 +9,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$logPath = 'C:\Windows\Temp\Configure-legacySQL-DB.log'
+$logPath = 'C:\Windows\Temp\Configure-LocalSQL-DB.log'
 Start-Transcript -Path $logPath -Append
 
-Write-Host 'Configuring SQL legacy Instance DB...'
+Write-Host 'Configuring local SQL Server team databases...'
 
 $ConfigureSql = @"
 DECLARE @DefaultLogPath NVARCHAR(500)
@@ -54,23 +54,15 @@ try {
 
     $command = New-Object system.Data.SqlClient.SqlCommand($Connection)
     $command.Connection = $Connection
-    $command.CommandTimeout = $QueryTimeout
+    $command.CommandTimeout = 0
 
     $command.CommandText = $ConfigureSql
     $result = $command.ExecuteNonQuery()
-    #$result = $command.ExecuteReader()
-    #$table = New-Object System.Data.DataTable
-    #$table.Load($result)
 }
 catch {
     Write-Host $result
     $ErrorString = $_ | format-list -force | Out-String
     Write-Error "ERR: $ErrorString"
-}
-finally {
-    if ($null -ne $serverConnection -and $serverConnection.IsOpen) {
-        $serverConnection.Disconnect()
-    }
 }
 try {
 	$Connection.Close()

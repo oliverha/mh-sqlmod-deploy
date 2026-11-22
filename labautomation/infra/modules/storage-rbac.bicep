@@ -1,5 +1,4 @@
 param storageAccountName string
-param vmPrincipalId string
 param sqlmiPrincipalId string
 
 var storageBlobDataContributorRoleId = subscriptionResourceId(
@@ -16,22 +15,6 @@ var storageBlobDataReaderRoleId = subscriptionResourceId(
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
   name: storageAccountName
-}
-
-resource vmBlobContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(
-    storageAccount.id,
-    vmPrincipalId,
-    storageBlobDataContributorRoleId
-  )
-
-  scope: storageAccount
-
-  properties: {
-    roleDefinitionId: storageBlobDataContributorRoleId
-    principalId: vmPrincipalId
-    principalType: 'ServicePrincipal'
-  }
 }
 
 /* resource sqlmiBlobDataReaderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

@@ -27,7 +27,7 @@ if (Test-Path $EnvironmentInfoPath) {
 
 "Your Hack-Environment" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force
 "---------------------------------------------------------------------------" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
-"SQL Server 2016:      legacysql2016" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
+"SQL Server 2017:      localhost (Developer Edition on this VM)" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL Server (Auth):    Windows Authentication" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL Managed Instance: $ManagedInstanceServer" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append

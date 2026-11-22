@@ -96,8 +96,7 @@ $SqlMiSysadminUser = $me.UserPrincipalName
 #@{"HackboxCredential" = @{ name = "ResourceGroupName" ; value = $effectiveResourceGroup; note = "The name of the resource group where lab resources are deployed" }}
 @{"HackboxCredential" = @{ name = "Team VM Name" ; value = $vmName; note = "The name of the Team VM"; group = 'Lab-General'}}
 @{"HackboxCredential" = @{ name = "Team / Link Name" ; value = $TeamName; note = "Name of the Team (Prefix for DBs and to use as Link Name for SQLMI)"; group = 'Lab-General'}}
-
-$legacySQLName = "legacySQL2016"
+@{"HackboxCredential" = @{ name = "Local SQL Server Name" ; value = "localhost"; note = "SQL Server 2017 Developer Edition on the Team VM (Windows Authentication)"; group = 'Lab-General'}}
 
 $storageAccountName = Get-AzStorageAccount -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty StorageAccountName
 $managedInstanceFQDN = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroupName -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullyQualifiedDomainName
@@ -122,7 +121,6 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         managedInstanceFQDN       = $managedInstanceFQDN
         vmName                    = $vmName
         TeamName                  = $TeamName
-        legacySQLName             = $legacySQLName
         sqlMiAdminUsername        = $sqlMiAdminUsername
         sqlMiAdminPassword        = $sqlMiAdminPassword
         SqlMiSysadminUser         = $SqlMiSysadminUser
