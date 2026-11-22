@@ -83,8 +83,8 @@ param(
     # Nur Graph-Login und Prüfung der TAP-Policy; es wird nichts angelegt oder deployt
     [switch]$CheckTapPolicyOnly,
 
-    # Optional: Datei, in die die Testuser mit TAP geschrieben werden (enthält Geheimnisse, nicht einchecken)
-    [string]$TapOutputFile = ''
+    # Datei, in die die Testuser mit TAP geschrieben werden (enthält Geheimnisse, per .gitignore ausgenommen)
+    [string]$TapOutputFile = (Join-Path $PSScriptRoot 'local-lab-taps.csv')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -355,7 +355,7 @@ Confirm-ResourceGroup -Name $SharedResourceGroupName -Location $Location
 
 $me = (Get-AzADUser -SignedIn).Id
 if ($labUsers.Count -gt 0) {
-    # Der angemeldete User bleibt Owner, die Testuser erhalten Owner auf Shared-RG und eigener Lab-RG
+    # Die Berechtigungen auf den RGs vergibt das Deployment-Framework anhand der übergebenen Entra-IDs
     $allowedIds = @($me) + @($labUsers | ForEach-Object { $_.Id })
     foreach ($labUser in $labUsers) {
         $labUser | Add-Member -NotePropertyName ResourceGroupName -NotePropertyValue "$LabResourceGroupName-$($labUser.Name.ToLower())"
@@ -423,6 +423,8 @@ else {
 if ($labUsers.Count -gt 0) {
     Write-Step "Temporary Access Pass ($TapLifetimeMinutes Minuten) für $($labUsers.Count) Testuser erstellen"
     $taps = @($labUsers | ForEach-Object { New-LocalLabTap -User $_ })
+
+    Write-Host "`n    Temporary Access Pässe (gültig bis zur Spalte Expires):" -ForegroundColor Green
     $taps | Format-Table User, Team, TAP, Expires -AutoSize | Out-Host
 
     if ($TapOutputFile) {
