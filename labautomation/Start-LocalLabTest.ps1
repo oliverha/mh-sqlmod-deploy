@@ -14,6 +14,13 @@
     -SkipGraphLogin überspringt nur diesen Login; das Shared-Deployment verwendet
     dann weiterhin ein über Az bezogenes Graph-Token.
 
+    Mit -LabUserCount werden lokale Entra-ID-Testuser LABUSER-0001 ... angelegt (UPN labuser-0001@<Domain>),
+    für jeden Testuser eine eigene Lab-RG/Lab-VM deployt und am Ende pro User ein Temporary Access Pass (TAP)
+    erzeugt. Der TAP wird erst nach den Deployments erstellt, damit die Laufzeit (Standard 8 Stunden) für das
+    Lab nutzbar bleibt. Dafür sind Global Administrator (oder User Administrator + Authentication Administrator)
+    und eine TAP-Policy erforderlich, die die gewünschte Laufzeit erlaubt. Mit -CheckTapPolicyOnly wird nur
+    geprüft, ob TAPs mit der gewünschten Laufzeit erlaubt sind (nichts wird angelegt oder deployt).
+
 .NOTES
     Im adminpwsh-Container aus dem labautomation-Ordner ausführen:
 
@@ -26,6 +33,8 @@
         ./Start-LocalLabTest.ps1 -TenantId <id>                                  # nur Shared-Stage
         ./Start-LocalLabTest.ps1 -TenantId <id> -RunLabDeployment                # Shared + Lab-VM
         ./Start-LocalLabTest.ps1 -TenantId <id> -SubscriptionId <sub-id>         # Subscription direkt
+        ./Start-LocalLabTest.ps1 -TenantId <id> -CheckTapPolicyOnly              # darf ich 8h-TAPs erstellen?
+        ./Start-LocalLabTest.ps1 -TenantId <id> -LabUserCount 3 -RunLabDeployment # LABUSER-0001..0003 + 3 Lab-VMs + TAPs
 #>
 [CmdletBinding()]
 param(
@@ -43,20 +52,184 @@ param(
 
     [string]$SharedResourceGroupName = 'rg-sqlhack-shared',
 
-    # Resource Group für die Lab-VM (lokale Simulation der Teilnehmer-RG)
+    # Resource Group für die Lab-VM (lokale Simulation der Teilnehmer-RG).
+    # Mit -LabUserCount wird pro Testuser eine RG '<Name>-labuser-0001' usw. verwendet.
     [string]$LabResourceGroupName = 'rg_lab_local',
 
     # Separaten Graph-Login überspringen; Shared-Deployment nutzt dann ein Az-Graph-Token
     [switch]$SkipGraphLogin,
 
     # Nach erfolgreicher Shared-Stage auch deploy-lab.ps1 starten
-    [switch]$RunLabDeployment
+    [switch]$RunLabDeployment,
+
+    # Anzahl lokaler Entra-ID-Testuser (LABUSER-0001 ...) und damit Lab-VMs. 0 = nur der angemeldete User, keine Testuser.
+    [ValidateRange(0, 9999)]
+    [int]$LabUserCount = 0,
+
+    # Nummer des ersten Testusers (LABUSER-0001 = 1). Erlaubt z. B. weitere Testuser ab 11 nachzuziehen.
+    [ValidateRange(1, 9999)]
+    [int]$FirstLabUserNumber = 1,
+
+    # Domain der Testuser (UPN labuser-0001@<Domain>). Standard: Standarddomain des Tenants.
+    [string]$UserDomain = '',
+
+    # Laufzeit des Temporary Access Pass in Minuten (Standard 480 = 8 Stunden)
+    [ValidateRange(10, 43200)]
+    [int]$TapLifetimeMinutes = 480,
+
+    # Passt die TAP-Policy des Tenants an (aktiv, Laufzeit, mehrfach nutzbar), falls sie die Laufzeit nicht erlaubt
+    [switch]$UpdateTapPolicy,
+
+    # Nur Graph-Login und Prüfung der TAP-Policy; es wird nichts angelegt oder deployt
+    [switch]$CheckTapPolicyOnly,
+
+    # Optional: Datei, in die die Testuser mit TAP geschrieben werden (enthält Geheimnisse, nicht einchecken)
+    [string]$TapOutputFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
 function Write-Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
+
+function Connect-LocalGraph {
+    param([string[]]$Scopes)
+    # Das Shared-Deployment hinterlaesst ein Access-Token im Graph-Prozess-Cache, kein MSAL-JSON.
+    if (Get-MgContext) {
+        Write-Host '    Vorhandene Graph-Sitzung und Prozess-Cache werden zurueckgesetzt.'
+        Disconnect-MgGraph -ErrorAction Stop | Out-Null
+    }
+    Connect-MgGraph -TenantId $TenantId -UseDeviceCode -NoWelcome -ContextScope Process -Scopes $Scopes
+    Write-Host "    Graph verbunden als $((Get-MgContext).Account)" -ForegroundColor Green
+}
+
+function Get-GraphScopes {
+    $policyScope = if ($UpdateTapPolicy) { 'Policy.ReadWrite.AuthenticationMethod' } else { 'Policy.Read.All' }
+    if ($CheckTapPolicyOnly) { return @($policyScope) }
+
+    $scopes = @('Application.Read.All', 'RoleManagement.ReadWrite.Directory')
+    if ($LabUserCount -gt 0) {
+        $scopes += 'User.ReadWrite.All', 'UserAuthenticationMethod.ReadWrite.All', 'Domain.Read.All', $policyScope
+    }
+    $scopes
+}
+
+# Prüft, ob die TAP-Policy des Tenants TAPs mit der gewünschten Laufzeit erlaubt. Gibt $true zurück, wenn ja.
+function Test-TapPolicy {
+    $uri = 'https://graph.microsoft.com/v1.0/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/TemporaryAccessPass'
+    $policy = Invoke-MgGraphRequest -Method GET -Uri $uri
+
+    Write-Host ("    TAP-Policy: Status={0}, Laufzeit min/default/max = {1}/{2}/{3} Minuten, einmalig nutzbar={4}" -f `
+            $policy.state, $policy.minimumLifetimeInMinutes, $policy.defaultLifetimeInMinutes, $policy.maximumLifetimeInMinutes, $policy.isUsableOnce)
+
+    $patch = @{ '@odata.type' = '#microsoft.graph.temporaryAccessPassAuthenticationMethodConfiguration' }
+    $problems = @()
+
+    if ($policy.state -ne 'enabled') {
+        $problems += 'Die TAP-Methode ist im Tenant nicht aktiviert.'
+        $patch.state = 'enabled'
+    }
+    if ($policy.maximumLifetimeInMinutes -lt $TapLifetimeMinutes) {
+        $problems += "Die maximale TAP-Laufzeit ($($policy.maximumLifetimeInMinutes) Min) ist kleiner als $TapLifetimeMinutes Min."
+        $patch.maximumLifetimeInMinutes = $TapLifetimeMinutes
+    }
+    if ($policy.minimumLifetimeInMinutes -gt $TapLifetimeMinutes) {
+        $problems += "Die minimale TAP-Laufzeit ($($policy.minimumLifetimeInMinutes) Min) ist größer als $TapLifetimeMinutes Min."
+        $patch.minimumLifetimeInMinutes = $TapLifetimeMinutes
+    }
+    if ($policy.isUsableOnce) {
+        $problems += 'Die Policy erlaubt nur einmal nutzbare TAPs; für ein Lab werden mehrfach nutzbare TAPs benötigt.'
+        $patch.isUsableOnce = $false
+    }
+    $allUsers = @($policy.includeTargets | Where-Object { $_.id -eq 'all_users' })
+    if ($allUsers.Count -eq 0) {
+        $problems += 'Die TAP-Policy gilt nicht für alle Benutzer (includeTargets). Die Testuser müssen Mitglied der eingeschlossenen Gruppe sein.'
+        $patch.includeTargets = @(@{ targetType = 'group'; id = 'all_users'; isRegistrationRequired = $false })
+    }
+
+    if ($problems.Count -eq 0) {
+        Write-Host "    TAPs mit $TapLifetimeMinutes Minuten Laufzeit sind laut Policy erlaubt." -ForegroundColor Green
+        return $true
+    }
+
+    $problems | ForEach-Object { Write-Host "    - $_" -ForegroundColor Yellow }
+
+    if (-not $UpdateTapPolicy) {
+        Write-Host '    Mit -UpdateTapPolicy kann das Skript die Policy anpassen (Entra ID > Authentifizierungsmethoden > Temporary Access Pass).' -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host '    Passe die TAP-Policy an...' -ForegroundColor Yellow
+    Invoke-MgGraphRequest -Method PATCH -Uri $uri -Body ($patch | ConvertTo-Json -Depth 5) -ContentType 'application/json' | Out-Null
+    Write-Host '    TAP-Policy angepasst. Hinweis: MCAPS-Governance kann die Policy wieder zurücksetzen.' -ForegroundColor Green
+    return $true
+}
+
+function New-RandomPassword {
+    $sets = @('ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%&*?')
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    function Get-Char([string]$Chars) {
+        $b = New-Object byte[] 4
+        $rng.GetBytes($b)
+        $Chars[[int]([BitConverter]::ToUInt32($b, 0) % $Chars.Length)]
+    }
+    $chars = @($sets | ForEach-Object { Get-Char $_ })
+    $chars += 1..20 | ForEach-Object { Get-Char ($sets -join '') }
+    ($chars | Sort-Object { Get-Random }) -join ''
+}
+
+function Get-LocalLabUserName([int]$Number) { 'LABUSER-{0:D4}' -f $Number }
+
+function Confirm-LocalLabUser {
+    param([int]$Number, [string]$Domain)
+    $name = Get-LocalLabUserName $Number
+    $upn = "$($name.ToLower())@$Domain"
+    $filter = [uri]::EscapeDataString("userPrincipalName eq '$upn'")
+    $existing = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/users?`$filter=$filter&`$select=id,userPrincipalName").value)
+
+    if ($existing.Count -gt 0) {
+        Write-Host "    User $upn existiert bereits - wird wiederverwendet." -ForegroundColor Yellow
+        return [pscustomobject]@{ Name = $name; UserPrincipalName = $upn; Id = $existing[0].id }
+    }
+
+    $body = @{
+        accountEnabled    = $true
+        displayName       = $name
+        mailNickname      = $name.ToLower()
+        userPrincipalName = $upn
+        passwordProfile   = @{ forceChangePasswordNextSignIn = $false; password = (New-RandomPassword) }
+    } | ConvertTo-Json -Depth 5
+    $created = Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/users' -Body $body -ContentType 'application/json'
+    Write-Host "    User $upn angelegt." -ForegroundColor Green
+    [pscustomobject]@{ Name = $name; UserPrincipalName = $upn; Id = $created.id }
+}
+
+function New-LocalLabTap {
+    param([pscustomobject]$User)
+    $base = "https://graph.microsoft.com/v1.0/users/$($User.Id)/authentication/temporaryAccessPassMethods"
+
+    # Vorhandene TAPs entfernen, damit ein neuer TAP mit frischer Laufzeit erstellt werden kann
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            foreach ($old in @((Invoke-MgGraphRequest -Method GET -Uri $base).value)) {
+                Invoke-MgGraphRequest -Method DELETE -Uri "$base/$($old.id)" | Out-Null
+            }
+            $tap = Invoke-MgGraphRequest -Method POST -Uri $base -ContentType 'application/json' `
+                -Body (@{ lifetimeInMinutes = $TapLifetimeMinutes; isUsableOnce = $false } | ConvertTo-Json)
+            return [pscustomobject]@{
+                User    = $User.UserPrincipalName
+                Team    = $User.Name
+                TAP     = $tap.temporaryAccessPass
+                Expires = ([datetime]$tap.startDateTime).ToLocalTime().AddMinutes($TapLifetimeMinutes).ToString('yyyy-MM-dd HH:mm')
+            }
+        }
+        catch {
+            # Neu angelegte User sind für die Authentifizierungsmethoden-API kurz nicht sichtbar (Replikation)
+            if ($attempt -eq 10) { throw }
+            Start-Sleep -Seconds 10
+        }
+    }
+}
 
 function Confirm-ResourceGroup {
     param([string]$Name, [string]$Location)
@@ -78,6 +251,24 @@ function Show-HackboxCredentials {
         Write-Host "`n    HackboxCredentials aus $($Stage):" -ForegroundColor Green
         $creds | Format-Table name, value, note -AutoSize | Out-Host
     }
+}
+
+# ---------------------------------------------------------------------------
+# 0) Prüfungen und optional nur TAP-Policy prüfen
+# ---------------------------------------------------------------------------
+if ($LabUserCount -gt 0 -and $SkipGraphLogin) {
+    throw '-LabUserCount benötigt den Graph-Login, -SkipGraphLogin kann nicht verwendet werden.'
+}
+if ($LabUserCount -gt 0 -and ($FirstLabUserNumber + $LabUserCount - 1) -gt 9999) {
+    throw "Die Testuser-Nummern würden 9999 überschreiten ($FirstLabUserNumber + $LabUserCount - 1)."
+}
+
+if ($CheckTapPolicyOnly) {
+    Write-Step 'Graph-Anmeldung und Prüfung der TAP-Policy'
+    Connect-LocalGraph -Scopes (Get-GraphScopes)
+    $tapAllowed = Test-TapPolicy
+    if (-not $tapAllowed) { Write-Warning "TAPs mit $TapLifetimeMinutes Minuten Laufzeit sind aktuell nicht erlaubt." }
+    return
 }
 
 # ---------------------------------------------------------------------------
@@ -133,14 +324,27 @@ if ($LASTEXITCODE -ne 0) { throw 'az account set fehlgeschlagen.' }
 # ---------------------------------------------------------------------------
 if (-not $SkipGraphLogin) {
     Write-Step 'Anmeldung Microsoft Graph (Device Code)'
-    # Das Shared-Deployment hinterlaesst ein Access-Token im Graph-Prozess-Cache, kein MSAL-JSON.
-    if (Get-MgContext) {
-        Write-Host '    Vorhandene Graph-Sitzung und Prozess-Cache werden zurueckgesetzt.'
-        Disconnect-MgGraph -ErrorAction Stop | Out-Null
+    Connect-LocalGraph -Scopes (Get-GraphScopes)
+}
+
+# ---------------------------------------------------------------------------
+# 4b) Optional: lokale Entra-ID-Testuser LABUSER-0001 ... anlegen
+# ---------------------------------------------------------------------------
+$labUsers = @()
+if ($LabUserCount -gt 0) {
+    Write-Step 'TAP-Policy prüfen'
+    if (-not (Test-TapPolicy)) {
+        throw "TAPs mit $TapLifetimeMinutes Minuten Laufzeit sind nicht erlaubt. Policy im Tenant anpassen oder -UpdateTapPolicy bzw. -TapLifetimeMinutes verwenden."
     }
-    Connect-MgGraph -TenantId $TenantId -UseDeviceCode -NoWelcome `
-        -ContextScope Process -Scopes 'Application.Read.All', 'RoleManagement.ReadWrite.Directory'
-    Write-Host "    Graph verbunden als $((Get-MgContext).Account)" -ForegroundColor Green
+
+    Write-Step "$LabUserCount Entra-ID-Testuser anlegen / prüfen"
+    if (-not $UserDomain) {
+        $UserDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/domains').value |
+            Where-Object { $_.isDefault } | Select-Object -First 1 -ExpandProperty id
+    }
+    Write-Host "    Domain: $UserDomain"
+    $labUsers = @($FirstLabUserNumber..($FirstLabUserNumber + $LabUserCount - 1) |
+        ForEach-Object { Confirm-LocalLabUser -Number $_ -Domain $UserDomain })
 }
 
 # ---------------------------------------------------------------------------
@@ -148,10 +352,21 @@ if (-not $SkipGraphLogin) {
 # ---------------------------------------------------------------------------
 Write-Step 'Resource Groups prüfen / anlegen'
 Confirm-ResourceGroup -Name $SharedResourceGroupName -Location $Location
-Confirm-ResourceGroup -Name $LabResourceGroupName    -Location $Location
 
 $me = (Get-AzADUser -SignedIn).Id
-Write-Host "    AllowedEntraUserIds: $me"
+if ($labUsers.Count -gt 0) {
+    # Der angemeldete User bleibt Owner, die Testuser erhalten Owner auf Shared-RG und eigener Lab-RG
+    $allowedIds = @($me) + @($labUsers | ForEach-Object { $_.Id })
+    foreach ($labUser in $labUsers) {
+        $labUser | Add-Member -NotePropertyName ResourceGroupName -NotePropertyValue "$LabResourceGroupName-$($labUser.Name.ToLower())"
+        Confirm-ResourceGroup -Name $labUser.ResourceGroupName -Location $Location
+    }
+}
+else {
+    $allowedIds = @($me)
+    Confirm-ResourceGroup -Name $LabResourceGroupName -Location $Location
+}
+Write-Host "    AllowedEntraUserIds: $($allowedIds -join ', ')"
 
 # ---------------------------------------------------------------------------
 # 6) shared-deploy-lab.ps1 starten
@@ -167,27 +382,51 @@ Write-Step 'Starte shared-deploy-lab.ps1'
 $sharedOutput = & $sharedScript `
     -SubscriptionId      $SubscriptionId `
     -PreferredLocation   $Location `
-    -AllowedEntraUserIds $me
+    -AllowedEntraUserIds $allowedIds
 Show-HackboxCredentials -Output $sharedOutput -Stage 'shared-deploy-lab.ps1'
 Write-Host '    Shared-Stage abgeschlossen.' -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
-# 7) Optional: deploy-lab.ps1 für die Lab-VM
+# 7) Optional: deploy-lab.ps1 für die Lab-VM(s)
 # ---------------------------------------------------------------------------
 if ($RunLabDeployment) {
     $labScript = Join-Path $PSScriptRoot 'deploy-lab.ps1'
     if (-not (Test-Path $labScript)) { throw "deploy-lab.ps1 nicht gefunden in '$PSScriptRoot'." }
 
-    Write-Step "Starte deploy-lab.ps1 in '$LabResourceGroupName'"
-    $labOutput = & $labScript `
-        -DeploymentType      'resourcegroup' `
-        -SubscriptionId      $SubscriptionId `
-        -ResourceGroupName   $LabResourceGroupName `
-        -PreferredLocation   $Location `
-        -AllowedEntraUserIds $me
-    Show-HackboxCredentials -Output $labOutput -Stage 'deploy-lab.ps1'
+    # Ohne Testuser: eine Lab-VM für den angemeldeten User, sonst eine Lab-VM pro Testuser (nacheinander)
+    $labTargets = if ($labUsers.Count -gt 0) {
+        $labUsers | ForEach-Object { [pscustomobject]@{ ResourceGroupName = $_.ResourceGroupName; UserId = $_.Id } }
+    }
+    else {
+        [pscustomobject]@{ ResourceGroupName = $LabResourceGroupName; UserId = $me }
+    }
+
+    foreach ($target in $labTargets) {
+        Write-Step "Starte deploy-lab.ps1 in '$($target.ResourceGroupName)'"
+        $labOutput = & $labScript `
+            -DeploymentType      'resourcegroup' `
+            -SubscriptionId      $SubscriptionId `
+            -ResourceGroupName   $target.ResourceGroupName `
+            -PreferredLocation   $Location `
+            -AllowedEntraUserIds $target.UserId
+        Show-HackboxCredentials -Output $labOutput -Stage "deploy-lab.ps1 ($($target.ResourceGroupName))"
+    }
     Write-Host '    Lab-Deployment abgeschlossen.' -ForegroundColor Green
 }
 else {
-    Write-Host "`nLab-VM noch nicht deployt. Mit -RunLabDeployment wird deploy-lab.ps1 in '$LabResourceGroupName' gestartet." -ForegroundColor Yellow
+    Write-Host "`nLab-VM noch nicht deployt. Mit -RunLabDeployment wird deploy-lab.ps1 gestartet." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------------
+# 8) TAPs für die Testuser (erst jetzt, damit die Laufzeit nach dem Deployment beginnt)
+# ---------------------------------------------------------------------------
+if ($labUsers.Count -gt 0) {
+    Write-Step "Temporary Access Pass ($TapLifetimeMinutes Minuten) für $($labUsers.Count) Testuser erstellen"
+    $taps = @($labUsers | ForEach-Object { New-LocalLabTap -User $_ })
+    $taps | Format-Table User, Team, TAP, Expires -AutoSize | Out-Host
+
+    if ($TapOutputFile) {
+        $taps | Export-Csv -Path $TapOutputFile -NoTypeInformation -Encoding UTF8
+        Write-Host "    TAPs gespeichert in '$TapOutputFile' (enthält Geheimnisse, nicht einchecken)." -ForegroundColor Yellow
+    }
 }
