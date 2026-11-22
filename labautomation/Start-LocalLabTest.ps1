@@ -122,8 +122,19 @@ function Get-GraphScopes {
 function Test-GlobalAdminActive {
     $globalAdminRoleId = '62e90394-69f5-4237-9190-012177145e10'
     $meId = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me?$select=id').id
+
+    # Aktivierte Rollen (auch per PIM oder Rollen-Gruppe) erscheinen als directoryRole in transitiveMemberOf
+    try {
+        $roles = @((Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/me/transitiveMemberOf/microsoft.graph.directoryRole?$select=id,roleTemplateId').value)
+        return (@($roles | Where-Object { $_.roleTemplateId -eq $globalAdminRoleId }).Count -gt 0)
+    }
+    catch {
+        Write-Host "    transitiveMemberOf nicht abrufbar ($($_.Exception.Message)), prüfe direkte Rollenzuweisungen." -ForegroundColor Yellow
+    }
+
+    # Fallback: direkte aktive Rollenzuweisungen
     $filter = [uri]::EscapeDataString("principalId eq '$meId' and roleDefinitionId eq '$globalAdminRoleId'")
-    $assignments = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/roleManagement/directory/transitiveRoleAssignments?`$filter=$filter").value)
+    $assignments = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?`$filter=$filter").value)
     $assignments.Count -gt 0
 }
 
