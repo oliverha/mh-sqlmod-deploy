@@ -3,7 +3,7 @@
 Installs SQL Server 2017 Developer Edition (database engine) on the local machine.
 
 .DESCRIPTION
-Downloads the SQL Server 2017 Developer media (unless -IsoPath is given) and the
+Downloads the SQL Server 2017 Developer ISO (unless -IsoPath is given) and the
 latest cumulative update (CU31, required for the Managed Instance link), installs a
 default instance with mixed mode authentication and creates a SQL login with sysadmin
 rights. Local administrators and SYSTEM are sysadmins, so Windows authentication works
@@ -26,7 +26,7 @@ param
     # Optional local SQL Server 2017 Developer ISO. Skips the download of the media.
     [string] $IsoPath,
 
-    [string] $BootstrapperUri = 'https://go.microsoft.com/fwlink/?linkid=853016',
+    [string] $IsoUri = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-x64-ENU-Dev.iso',
 
     # SQL Server 2017 CU31 (KB5016884), the last cumulative update. Required for the Managed Instance link.
     [string] $CumulativeUpdateUri = 'https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe'
@@ -61,33 +61,14 @@ try
 
         if ([string]::IsNullOrWhiteSpace($IsoPath))
         {
-            $bootstrapper = Join-Path $InstallDirectory 'SQL2017-SSEI-Dev.exe'
+            $IsoPath = Join-Path $InstallDirectory ([System.IO.Path]::GetFileName($IsoUri))
 
-            Write-Host 'Downloading SQL Server 2017 Developer installer.'
-            Invoke-WebRequest -Uri $BootstrapperUri -OutFile $bootstrapper -UseBasicParsing
+            Write-Host "Downloading SQL Server 2017 Developer media from $IsoUri."
+            & curl.exe --location --fail --silent --show-error --retry 5 --retry-delay 10 --output $IsoPath $IsoUri
 
-            Write-Host 'Downloading SQL Server 2017 Developer media (ISO).'
-            $download = Start-Process -FilePath $bootstrapper -Wait -PassThru -ArgumentList @(
-                '/ACTION=Download',
-                "/MEDIAPATH=`"$InstallDirectory`"",
-                '/MEDIATYPE=ISO',
-                '/LANGUAGE=en-US',
-                '/IACCEPTSQLSERVERLICENSETERMS',
-                '/QUIET'
-            )
-
-            if ($download.ExitCode -ne 0)
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $IsoPath))
             {
-                throw "Download of the SQL Server media failed with exit code $($download.ExitCode)."
-            }
-
-            $IsoPath = (Get-ChildItem -Path $InstallDirectory -Filter '*.iso' -File |
-                Sort-Object Length -Descending |
-                Select-Object -First 1).FullName
-
-            if (-not $IsoPath)
-            {
-                throw "No ISO file found in $InstallDirectory after the download."
+                throw "Download of the SQL Server media failed (curl exit code $LASTEXITCODE)."
             }
         }
 
@@ -96,7 +77,12 @@ try
 
         $updateFile = Join-Path $updateDirectory ([System.IO.Path]::GetFileName($CumulativeUpdateUri))
         Write-Host "Downloading cumulative update $([System.IO.Path]::GetFileName($CumulativeUpdateUri))."
-        Invoke-WebRequest -Uri $CumulativeUpdateUri -OutFile $updateFile -UseBasicParsing
+        & curl.exe --location --fail --silent --show-error --retry 5 --retry-delay 10 --output $updateFile $CumulativeUpdateUri
+
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $updateFile))
+        {
+            throw "Download of the cumulative update failed (curl exit code $LASTEXITCODE)."
+        }
 
         Write-Host "Mounting $IsoPath."
         $image = Mount-DiskImage -ImagePath $IsoPath -PassThru
