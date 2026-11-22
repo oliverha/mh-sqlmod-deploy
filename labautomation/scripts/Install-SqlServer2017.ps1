@@ -6,8 +6,9 @@ Installs SQL Server 2017 Developer Edition (database engine) on the local machin
 Downloads the SQL Server 2017 Developer ISO (unless -IsoPath is given) and the
 latest cumulative update (CU31, required for the Managed Instance link), installs a
 default instance with mixed mode authentication and creates a SQL login with sysadmin
-rights. Local administrators and SYSTEM are sysadmins, so Windows authentication works
-for the lab user.
+rights through the 'sa' account. Local administrators are sysadmins, so Windows authentication
+works for the lab user. The setup account (SYSTEM in the custom script extension) is only a
+temporary sysadmin during the setup, so it must not be used to connect afterwards.
 
 The script is idempotent: it exits early if a SQL Server 2017 default instance exists.
 #>
@@ -98,7 +99,7 @@ try
                 '/IACCEPTSQLSERVERLICENSETERMS',
                 '/FEATURES=SQLENGINE',
                 '/INSTANCENAME=MSSQLSERVER',
-                '/SQLSYSADMINACCOUNTS="BUILTIN\Administrators" "NT AUTHORITY\SYSTEM"',
+                '/SQLSYSADMINACCOUNTS="BUILTIN\Administrators"',
                 '/SECURITYMODE=SQL',
                 "/SAPWD=`"$sqlpassword`"",
                 '/SQLSVCACCOUNT="NT Service\MSSQLSERVER"',
@@ -112,7 +113,17 @@ try
                 "/UPDATESOURCE=`"$updateDirectory`""
             )
 
-            $setup = Start-Process -FilePath "${driveLetter}:\setup.exe" -ArgumentList $setupArguments -Wait -PassThru
+            $progressLog = 'C:\Windows\Temp\SqlServer2017-setup-progress.log'
+            $setup = Start-Process -FilePath "${driveLetter}:\setup.exe" -ArgumentList ($setupArguments + '/INDICATEPROGRESS') `
+                -RedirectStandardOutput $progressLog -PassThru -WindowStyle Hidden
+            $null = $setup.Handle   # keeps the handle so that ExitCode is available
+
+            # No -Wait: it would also wait for child processes. A hanging setup is stopped after 60 minutes.
+            if (-not $setup.WaitForExit(3600000))
+            {
+                Stop-Process -Id $setup.Id -Force
+                throw "SQL Server setup did not finish within 60 minutes and was stopped. See $progressLog and C:\Program Files\Microsoft SQL Server\140\Setup Bootstrap\Log\Summary.txt."
+            }
 
             if ($setup.ExitCode -notin 0, 3010)
             {
@@ -136,10 +147,14 @@ IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$($sqlusername
 ALTER SERVER ROLE [sysadmin] ADD MEMBER [$($sqlusername.Replace(']', ']]'))];
 "@
 
+    # The login is created with the 'sa' account (SQL authentication is enabled by the setup), independent of the Windows account running this script
+    $saPassword = ConvertTo-SecureString -String $sqlpassword -AsPlainText -Force
+    $saPassword.MakeReadOnly()
+
     for ($attempt = 1; $attempt -le 18; $attempt++)
     {
-        $connection = New-Object System.Data.SqlClient.SqlConnection('Data Source=localhost;Initial Catalog=master;Integrated Security=True;TrustServerCertificate=True;')
-
+        $connection = New-Object System.Data.SqlClient.SqlConnection('Data Source=localhost;Initial Catalog=master;TrustServerCertificate=True;Connect Timeout=10;')
+        $connection.Credential = New-Object System.Data.SqlClient.SqlCredential('sa', $saPassword)
         try
         {
             $connection.Open()
