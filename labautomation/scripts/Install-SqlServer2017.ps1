@@ -4,7 +4,7 @@ Installs SQL Server 2017 Developer Edition (database engine) on the local machin
 
 .DESCRIPTION
 Downloads the SQL Server 2017 Developer ISO (unless -IsoPath is given) and the
-latest cumulative update (CU31, required for the Managed Instance link), installs a
+latest cumulative update (CU31 Azure Connect Pack, required for the Managed Instance link), installs a
 default instance with mixed mode authentication and creates a SQL login with sysadmin
 rights through the 'sa' account. Local administrators are sysadmins, so Windows authentication
 works for the lab user. The setup account (SYSTEM in the custom script extension) is only a
@@ -29,8 +29,8 @@ param
 
     [string] $IsoUri = 'https://download.microsoft.com/download/E/F/2/EF23C21D-7860-4F05-88CE-39AA114B014B/SQLServer2017-x64-ENU-Dev.iso',
 
-    # SQL Server 2017 CU31 (KB5016884), the last cumulative update. Required for the Managed Instance link.
-    [string] $CumulativeUpdateUri = 'https://download.microsoft.com/download/C/4/F/C4F908C9-98ED-4E5F-88D5-7D6A5004AEBD/SQLServer2017-KB5016884-x64.exe'
+    # SQL Server 2017 CU31 Azure Connect Pack (KB5050533). Required for the Managed Instance link; the plain CU31 (KB5016884) does not work with it.
+    [string] $CumulativeUpdateUri = 'https://download.microsoft.com/download/c/4/f/c4f908c9-98ed-4e5f-88d5-7d6a5004aebd/SQLServer2017-KB5050533-x64.exe'
 )
 
 $ErrorActionPreference = 'Stop'
