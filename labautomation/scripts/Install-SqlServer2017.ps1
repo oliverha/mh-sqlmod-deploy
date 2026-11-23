@@ -39,6 +39,12 @@ $ProgressPreference = 'SilentlyContinue'
 $logPath = 'C:\Windows\Temp\Install-SqlServer2017.log'
 Start-Transcript -Path $logPath -Append
 
+# Prefix every message with a time stamp so the log shows which step takes how long
+function Write-Host {
+    param([Parameter(ValueFromRemainingArguments = $true)] $Object)
+    Microsoft.PowerShell.Utility\Write-Host ('[{0:yyyy-MM-dd HH:mm:ss}] {1}' -f (Get-Date), ($Object -join ' '))
+}
+
 try
 {
     [Net.ServicePointManager]::SecurityProtocol =
@@ -59,6 +65,17 @@ try
     else
     {
         New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null
+
+        # Real-time scanning of the 1.5 GB ISO, the CU and the setup files slows the installation down considerably on a small VM
+        try
+        {
+            Add-MpPreference -ExclusionPath $InstallDirectory, 'C:\Program Files\Microsoft SQL Server', 'C:\SQLBackups' -ExclusionProcess 'sqlservr.exe', 'setup.exe' -ErrorAction Stop
+            Write-Host 'Microsoft Defender exclusions for the SQL Server installation added.'
+        }
+        catch
+        {
+            Write-Host "Could not add Microsoft Defender exclusions: $($_.Exception.Message)"
+        }
 
         if ([string]::IsNullOrWhiteSpace($IsoPath))
         {
@@ -119,11 +136,21 @@ try
             $null = $setup.Handle   # keeps the handle so that ExitCode is available
 
             # No -Wait: it would also wait for child processes. A hanging setup is stopped after 60 minutes.
-            if (-not $setup.WaitForExit(3600000))
+            # Every minute the last progress line of the setup is written to the log.
+            $deadline = (Get-Date).AddMinutes(60)
+            while (-not $setup.WaitForExit(60000))
             {
-                Stop-Process -Id $setup.Id -Force
-                throw "SQL Server setup did not finish within 60 minutes and was stopped. See $progressLog and C:\Program Files\Microsoft SQL Server\140\Setup Bootstrap\Log\Summary.txt."
+                $lastProgress = Get-Content -Path $progressLog -Tail 1 -ErrorAction SilentlyContinue
+                Write-Host "Setup is running (pid $($setup.Id)). Last progress: $lastProgress"
+
+                if ((Get-Date) -gt $deadline)
+                {
+                    Stop-Process -Id $setup.Id -Force
+                    throw "SQL Server setup did not finish within 60 minutes and was stopped. See $progressLog and C:\Program Files\Microsoft SQL Server\140\Setup Bootstrap\Log\Summary.txt."
+                }
             }
+
+            Write-Host "Setup finished with exit code $($setup.ExitCode)."
 
             if ($setup.ExitCode -notin 0, 3010)
             {
