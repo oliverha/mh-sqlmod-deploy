@@ -27,13 +27,13 @@ if (Test-Path $EnvironmentInfoPath) {
 
 "Your Hack-Environment" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force
 "---------------------------------------------------------------------------" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
-"SQL Server 2017:      localhost (Developer Edition on this VM)" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
+"SQL Server 2017:      legacySQL2017 (alias for localhost, Developer Edition on this VM)" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL Server (Auth):    Windows Authentication" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL Managed Instance: $ManagedInstanceServer" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL MI (Auth):        SQL Authentication" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "SQL MI (Username):    DemoUser" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
-"SQL MI (Password):    Demo@pass1234567" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
+"SQL MI (Password):    Please use password provided" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "Storage Account:      $StorageAccountName" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 

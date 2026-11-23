@@ -86,8 +86,6 @@ output AZURE_LOCATION string = location
 
 //output SQL_MI_FQDN string = managedInstance.outputs.fullyQualifiedDomainName
 
-//output LEGACY_SQL_VM_NAME string = legacySqlVm.outputs.vmName
-
 //output TEAM_VM_NAMES array = teamVms.outputs.vmNames
 
 //output BASTION_NAME string = bastion.outputs.bastionName

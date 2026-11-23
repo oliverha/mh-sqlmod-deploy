@@ -39,6 +39,9 @@ Write-Host "Downloading Team Databases..."
 Write-Host "Configuring local SQL Server..."
 & .\Configure-LocalSQL.ps1 -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
 
+Write-Host "Creating the 32-bit and 64-bit SQL alias legacySQL2017 -> localhost..."
+& .\Set-SqlAlias.ps1
+
 Write-Host "Restoring Team Databases..."
 & .\Restore-TeamDatabases.ps1 -TeamName $TeamName -BackupBaseUri $BackupBaseUri -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword
 

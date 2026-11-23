@@ -9,7 +9,7 @@
 All workshop resources are deployed into one Virtual Network (**SQLHACK-SHARED-VNET**) with three subnets:
 
 * **TeamJumpServers subnet**: Every team has its own Windows 11 VM (**Team-VMXX**, accessible via Azure Bastion/RDP). It mimics your company desktop and has SQL Server Management Studio (SSMS) installed. You do all your work from this VM.
-* **Local SQL Server**: Every team VM runs its own **SQL Server 2017 Developer Edition** instance (connect to **localhost**) which mimics your on-premises SQL Server. It hosts **4 databases of your team** (*LABUSER-XXXX_LocalMasterDataDB*, *LABUSER-XXXX_SharedMasterDataDB*, *LABUSER-XXXX_TenantDataDB* and *LABUSER-XXXX_GlobalDataDB*). A storage account is only used during the deployment of the lab.
+* **Local SQL Server**: Every team VM runs its own **SQL Server 2017 Developer Edition** instance (server name **legacySQL2017**, an alias for localhost) which mimics your on-premises SQL Server. It hosts **4 databases of your team** (*LABUSER-XXXX_LocalMasterDataDB*, *LABUSER-XXXX_SharedMasterDataDB*, *LABUSER-XXXX_TenantDataDB* and *LABUSER-XXXX_GlobalDataDB*). A storage account is only used during the deployment of the lab.
 * **Management subnet**: Hosts shared management VMs of the lab. You do not need them for the challenges.
 * **ManagedInstance subnet**: The **Azure SQL Managed Instance** is the migration target. It is shared by all teams.
 

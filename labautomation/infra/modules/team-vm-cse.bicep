@@ -43,6 +43,7 @@ resource ConfigureTeamMachine 'Microsoft.Compute/virtualMachines/extensions@2024
         '${repoBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
         '${repoBaseURL}/scripts/Download-TeamDatabases.ps1'
         '${repoBaseURL}/scripts/Configure-LocalSQL.ps1'
+        '${repoBaseURL}/scripts/Set-SqlAlias.ps1'
         '${repoBaseURL}/scripts/Restore-TeamDatabases.ps1'
         '${repoBaseURL}/scripts/Configure-LocalSQL-DB.ps1'
         '${repoBaseURL}/scripts/Configure-SQLMI-Sysadmins.ps1'

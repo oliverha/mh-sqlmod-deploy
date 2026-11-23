@@ -92,7 +92,7 @@ You need two accounts in SSMS: your **Azure account** (to select the Managed Ins
 
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|In the **Connect to Server** dialog connect to **localhost** (SQL Server 2017 on your team VM). Use **Windows Authentication** and check the **Trust server certificate** checkbox.|![Connect to the local SQL Server](../../Images/Connect_legacy_SQL_00.png)||
+|In the **Connect to Server** dialog connect to **legacySQL2017** (an alias for the SQL Server 2017 instance on your team VM, i.e. localhost). Use **Windows Authentication** and check the **Trust server certificate** checkbox.|![Connect to the local SQL Server](../../Images/Connect_legacy_SQL_00.png)||
 |In Object Explorer expand the **Databases** node. You should see the databases of your team.|![Local SQL Server databases in Object Explorer](../../Images/Connect_legacy_SQL_01.png)|**⚠️ WARNING: Only work with the databases of your team (LABUSER-XXXX). Do NOT change the databases of other teams!**|
 
 ## 1.4 Connect to the Azure SQL Managed Instance
@@ -100,7 +100,7 @@ You need two accounts in SSMS: your **Azure account** (to select the Managed Ins
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
 |Connect to your Azure SQL Managed Instance in the **Connect to Server** dialog. Use the Managed Instance host name, Entra MFA authentication and the Entra ID credentials of the lab.|![Connect to the Azure SQL Managed Instance](../../Images/Connect_SQLMI_00.png)<br>![](../../Images/Connect_SQLMI_01.png)<br>![](../../Images/Connect_SQLMI_02.png)|**Note**: The Managed Instance host name and the credentials are **Login:** **<secret group="Azure" name="Entra ID Username" show="true"></secret>** **TAP:**  **<secret group="Azure" name="Entra ID TAP"></secret>**. Check the **Trust server certificate** checkbox is optional here.|
-|Both servers are now visible in Object Explorer. The Managed Instance does not contain your team databases yet.|![Object Explorer with legacy SQL Server and Managed Instance](../../Images/Connect_SQLMI_03.png)||
+|Both servers are now visible in Object Explorer. The Managed Instance does not contain your team databases yet.|![Object Explorer with local SQL Server and Managed Instance](../../Images/Connect_SQLMI_03.png)||
 
 ## 1.5 Say hello to GitHub Copilot
 
@@ -135,7 +135,7 @@ In this section we will leverage GitHub Copilot to mitigate the migration blocke
 
 |**Narrative**| **Screenshot**| **Notes**|
 |:------------|:--------------|:---------|
-|Use a prompt similar to the following: *The migration assessment tells me that I cannot migrate to Managed Instance. Can you analyze the blockers and give me instructions how I will be able to migrate to MI? "C:\Users\DemoUser\AppData\Local\Microsoft\SqlAssessment\SqlAssessment-LegacySQL2016-202608121317html"* |![](../../Images/Github_Prompt_Challenge01.png)|**Prompt**: *"Can you analyze the blockers for the migration to SQL MI and help me to remove them?"* You can also add the path of the assessment report to the prompt as shown here.|
+|Use a prompt similar to the following: *The migration assessment tells me that I cannot migrate to Managed Instance. Can you analyze the blockers and give me instructions how I will be able to migrate to MI? "C:\Users\DemoUser\AppData\Local\Microsoft\SqlAssessment\SqlAssessment-&lt;servername&gt;-202608121317.html"* |![](../../Images/Github_Prompt_Challenge01.png)|**Prompt**: *"Can you analyze the blockers for the migration to SQL MI and help me to remove them?"* You can also add the path of the assessment report to the prompt as shown here.|
 |GitHub requests access to the provided assessment report. Please approve access.|![](../../Images/Github_Approve_Access_to_assessment_report.png)|**Note**: The access requests could occur several times.|
 |GitHub identified the blocker and generates commands to mitigate the blocker.|![](../../Images/Github_Identifies_Blocker01.png)||
 ||![](../../Images/Github_Identifies_Blocker02.png)||
@@ -164,13 +164,13 @@ In this section we will use SQL Server Management Studio (SSMS) to migrate the a
 |The databases are connected to MI Link.|<!--![](../../Images/MILink-Wizard09.png)-->||
 |After the Link was established wait until the databases are synchronized.|![](../../Images/check_MILink_Sync.png)|**Prompt**: *"How can I check whether my databases are fully synchronized to the Managed Instance? Please use the T-SQL script from the annotations as a starting point."*|
 |You will see multiple availability groups for every database. This is normal.|![](../../Images/MILink_AG_View.png)||
-|For the cut-over stop the application connectivity to the legacy SQL Server and do the failover.|||
-|For every database of your team use the context menu on the source legacy SQL Server and select **Azure SQL Managed Instance Link**->**Failover...**.|![](../../Images/MILink_Failover.png)||
+|For the cut-over stop the application connectivity to the source SQL Server and do the failover.|||
+|For every database of your team use the context menu on the source SQL Server and select **Azure SQL Managed Instance Link**->**Failover...**.|![](../../Images/MILink_Failover.png)||
 |The Managed Instance Link Failover Wizard will check all prerequisites.|![](../../Images/MILink_Failover_Wizard01.png)||
 |If the database is healthy we can only do a Planned Manual Failover. Click **Next**.|![](../../Images/MILink_Failover_Wizard02.png)|**Prompt**: *"What is the difference between a planned manual failover and a forced failover in Managed Instance Link?"*|
 |We have to sign in to Azure and to the Managed Instance again. Click **Next**.|![](../../Images/MILink_Failover_Wizard03.png)||
 |The Wizard checks the readiness for the failover. All looks good. Click **Next**.|![](../../Images/MILink_Failover_Wizard04.png)||
-|Please acknowledge that you should stop application connectivity against the source database and select that the wizard will remove the distributed availability group.|![](../../Images/MILink_Failover_Wizard05.png)|**Note**: After this step you will have two writable copies of the databases on the legacy server and on the Managed Instance.|
+|Please acknowledge that you should stop application connectivity against the source database and select that the wizard will remove the distributed availability group.|![](../../Images/MILink_Failover_Wizard05.png)|**Note**: After this step you will have two writable copies of the databases on the source SQL Server and on the Managed Instance.|
 |Click **Next**.|![](../../Images/MILink_Failover_Wizard06.png)||
 |You will see a final summary and have the last option to generate a script. Click **Finish**.|<!--![](../../Images/MILink_Failover_Wizard07.png)-->||
 |The failover was successful.|<!--![](../../Images/MILink_Failover_Wizard08.png)-->||
@@ -251,7 +251,7 @@ You have migrated with one specific path. In real projects you have to decide **
 |:------------|:------------------------------------|
 |Estimate the downtime.|**Prompt**: *"How do I estimate the downtime for the cut-over with Managed Instance Link? Which steps does the downtime consist of, and how can I reduce it?"*|
 |Plan the cut-over.|**Prompt**: *"Create a cut-over runbook for a Managed Instance Link migration. Include the steps before, during and after the failover, the responsible roles and the checks after each step."*|
-|Plan the rollback.|**Prompt**: *"What is my rollback option if the application does not work after the cut-over to the Managed Instance? Is it possible to fall back to the legacy SQL Server and what data would I lose?"*<br>**Learn**: After the planned failover and the removal of the distributed availability group, both copies are writable. Plan the rollback before you start.|
+|Plan the rollback.|**Prompt**: *"What is my rollback option if the application does not work after the cut-over to the Managed Instance? Is it possible to fall back to the source SQL Server and what data would I lose?"*<br>**Learn**: After the planned failover and the removal of the distributed availability group, both copies are writable. Plan the rollback before you start.|
 |Reduce the risk.|**Prompt**: *"Which risks exist in a database migration and which mitigations do you recommend? Please present them as a risk table with probability, impact and mitigation."*|
 |Test before you migrate.|**Prompt**: *"How can I test my application against the Managed Instance before the final cut-over without losing data or stopping the source?"*|
 
@@ -283,7 +283,7 @@ A database migration is more than moving the data. Many dependencies live outsid
 |Check the compatibility level.|**Prompt**: *"Which database compatibility level does my migrated database have, and should I change it? What is the safe way to do that with Query Store?"*|
 |Update statistics and verify the performance.|**Prompt**: *"Which steps should I run after the migration to avoid performance regressions, for example updating statistics, enabling Query Store and comparing the baseline?"*<br>**Note**: Challenge 2 covers this topic in detail.|
 |Plan backups and high availability.|**Prompt**: *"How are backups, point-in-time restore and long-term retention handled on Managed Instance? What do I have to configure myself compared with my legacy server?"*|
-|Decommission the source.|**Prompt**: *"When and how should I decommission the legacy SQL Server after a successful migration? Create a checklist with the final backup, the access removal and the retention of evidence."*|
+|Decommission the source.|**Prompt**: *"When and how should I decommission the source SQL Server after a successful migration? Create a checklist with the final backup, the access removal and the retention of evidence."*|
 |Learn from the migration.|**Prompt**: *"Summarize our migration as lessons learned: which decisions did we make, what could have gone wrong and what would you do differently in the next migration?"*|
 
 # Prompt cheat sheet

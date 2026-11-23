@@ -23,7 +23,7 @@ This MicroHack scenario walks through modernizing SQL Server workloads to Azure,
 
 After completing this MicroHack you will be able to:
 
-* Implement a proof-of-concept (PoC) for migrating an on-premises SQL Server 2016 database into Azure SQL Database Managed Instance  (SQL MI)  
+* Implement a proof-of-concept (PoC) for migrating an on-premises SQL Server 2017 database into Azure SQL Database Managed Instance  (SQL MI)  
 * Perform assessments to reveal any feature parity and compatibility issues between the on-premises SQL Server database and the managed database offerings in Azure   
 * Migrate the on-premises databases into Azure, using Azure migration services  
 * Enable some of the advanced SQL features available in SQL MI to improve security and performance in your customer's application  
