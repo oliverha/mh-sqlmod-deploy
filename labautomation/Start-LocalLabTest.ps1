@@ -88,6 +88,10 @@ param(
     # Skip the check that the Global Administrator role is active (e.g. if another sufficient role is used)
     [switch]$SkipGlobalAdminCheck,
 
+    # Number of lab VMs deployed at the same time (like "5 at a time" in the MicroHack platform). Requires PowerShell 7; 1 = one after the other.
+    [ValidateRange(1, 40)]
+    [int]$ThrottleLimit = 5,
+
     # File the test users and their TAPs are written to (contains secrets, excluded by .gitignore)
     [string]$TapOutputFile = (Join-Path $PSScriptRoot 'local-lab-taps.csv')
 )
@@ -436,11 +440,12 @@ Write-Host '    Shared stage completed.' -ForegroundColor Green
 # ---------------------------------------------------------------------------
 # 7) Optional: deploy-lab.ps1 for the lab VM(s)
 # ---------------------------------------------------------------------------
+$labFailures = @()
 if ($RunLabDeployment) {
     $labScript = Join-Path $PSScriptRoot 'deploy-lab.ps1'
     if (-not (Test-Path $labScript)) { throw "deploy-lab.ps1 not found in '$PSScriptRoot'." }
 
-    # Without test users: one lab VM for the signed-in user, otherwise one lab VM per test user (one after the other)
+    # Without test users: one lab VM for the signed-in user, otherwise one lab VM per test user (-ThrottleLimit at a time)
     $labTargets = if ($labUsers.Count -gt 0) {
         $labUsers | ForEach-Object { [pscustomobject]@{ ResourceGroupName = $_.ResourceGroupName; UserId = $_.Id } }
     }
@@ -448,17 +453,70 @@ if ($RunLabDeployment) {
         [pscustomobject]@{ ResourceGroupName = $LabResourceGroupName; UserId = $me }
     }
 
-    foreach ($target in $labTargets) {
-        Write-Step "Running deploy-lab.ps1 in '$($target.ResourceGroupName)'"
-        $labOutput = & $labScript `
-            -DeploymentType      'resourcegroup' `
-            -SubscriptionId      $SubscriptionId `
-            -ResourceGroupName   $target.ResourceGroupName `
-            -PreferredLocation   $Location `
-            -AllowedEntraUserIds $target.UserId
-        Show-HackboxCredentials -Output $labOutput -Stage "deploy-lab.ps1 ($($target.ResourceGroupName))"
+    if ($labTargets.Count -gt 1 -and $ThrottleLimit -gt 1 -and $PSVersionTable.PSVersion.Major -ge 7) {
+        Write-Step "Running deploy-lab.ps1 for $($labTargets.Count) lab VMs ($ThrottleLimit at a time). Output of the deployments is interleaved."
+
+        # The Mhh* helper functions of the deployment framework must also be available in the parallel runspaces:
+        # import their modules, or recreate the functions that are defined directly in this session.
+        $mhhCommands = @(Get-Command -Name '*-Mhh*' -ErrorAction SilentlyContinue)
+        $mhhModulePaths = @($mhhCommands | Where-Object { $_.Module } | ForEach-Object { $_.Module.Path } | Select-Object -Unique)
+        $mhhFunctions = @($mhhCommands | Where-Object { -not $_.Module -and $_.CommandType -eq 'Function' } |
+            ForEach-Object { @{ Name = $_.Name; Definition = $_.Definition } })
+        $azContext = Get-AzContext
+
+        $labResults = $labTargets | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
+            $target = $_
+            try {
+                foreach ($modulePath in $using:mhhModulePaths) { Import-Module $modulePath -ErrorAction Stop }
+                foreach ($function in $using:mhhFunctions) {
+                    Set-Item -Path "function:global:$($function.Name)" -Value ([scriptblock]::Create($function.Definition))
+                }
+                Set-AzContext -Context $using:azContext | Out-Null
+
+                Write-Host "    [$($target.ResourceGroupName)] deployment started."
+                $output = & $using:labScript `
+                    -DeploymentType      'resourcegroup' `
+                    -SubscriptionId      $using:SubscriptionId `
+                    -ResourceGroupName   $target.ResourceGroupName `
+                    -PreferredLocation   $using:Location `
+                    -AllowedEntraUserIds $target.UserId
+                Write-Host "    [$($target.ResourceGroupName)] deployment finished."
+                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $true; Output = $output; Error = $null }
+            }
+            catch {
+                Write-Host "    [$($target.ResourceGroupName)] deployment FAILED: $($_.Exception.Message)"
+                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $false; Output = $null; Error = $_.Exception.Message }
+            }
+        }
+
+        foreach ($labResult in $labResults) {
+            if ($labResult.Success) {
+                Show-HackboxCredentials -Output $labResult.Output -Stage "deploy-lab.ps1 ($($labResult.ResourceGroupName))"
+            }
+            else {
+                $labFailures += "$($labResult.ResourceGroupName): $($labResult.Error)"
+            }
+        }
     }
-    Write-Host '    Lab deployment completed.' -ForegroundColor Green
+    else {
+        foreach ($target in $labTargets) {
+            Write-Step "Running deploy-lab.ps1 in '$($target.ResourceGroupName)'"
+            $labOutput = & $labScript `
+                -DeploymentType      'resourcegroup' `
+                -SubscriptionId      $SubscriptionId `
+                -ResourceGroupName   $target.ResourceGroupName `
+                -PreferredLocation   $Location `
+                -AllowedEntraUserIds $target.UserId
+            Show-HackboxCredentials -Output $labOutput -Stage "deploy-lab.ps1 ($($target.ResourceGroupName))"
+        }
+    }
+
+    if ($labFailures.Count -eq 0) {
+        Write-Host '    Lab deployment completed.' -ForegroundColor Green
+    }
+    else {
+        Write-Warning "$($labFailures.Count) lab deployment(s) failed:`n  - $($labFailures -join "`n  - ")"
+    }
 }
 else {
     Write-Host "`nLab VM not deployed yet. Use -RunLabDeployment to run deploy-lab.ps1." -ForegroundColor Yellow
@@ -485,4 +543,8 @@ if ($labUsers.Count -gt 0) {
         $taps | Export-Csv -Path $TapOutputFile -NoTypeInformation -Encoding UTF8
         Write-Host "    TAPs saved to '$TapOutputFile' (contains secrets, do not check in)." -ForegroundColor Yellow
     }
+}
+
+if ($labFailures.Count -gt 0) {
+    throw "$($labFailures.Count) lab deployment(s) failed, see the messages above."
 }

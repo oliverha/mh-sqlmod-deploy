@@ -207,7 +207,15 @@ foreach ($backupFile in $sharedDatabases) {
         Invoke-WebRequest -Uri "$repoBaseURL/Databases/$backupFile" -OutFile $localFile -UseBasicParsing -ErrorAction Stop
     }
     Write-Host "Uploading $backupFile ..."
-    Set-AzStorageBlobContent -File $localFile -Container $backupContainerName -Blob $backupFile -Context $storageContext -Force -ErrorAction Stop | Out-Null
+    # Suppress the progress bar of the upload; in a container terminal it is not cleaned up afterwards
+    $previousProgressPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        Set-AzStorageBlobContent -File $localFile -Container $backupContainerName -Blob $backupFile -Context $storageContext -Force -ErrorAction Stop | Out-Null
+    }
+    finally {
+        $ProgressPreference = $previousProgressPreference
+    }
 }
 Remove-Item -LiteralPath $downloadDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
