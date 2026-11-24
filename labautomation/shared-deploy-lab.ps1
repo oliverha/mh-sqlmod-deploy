@@ -37,7 +37,11 @@ $requiredProviders = @(
     "Microsoft.SqlVirtualMachine",
     "Microsoft.DevTestLab",
     "Microsoft.OperationalInsights",
-    "Microsoft.Insights"
+    "Microsoft.Insights",
+    "Microsoft.HybridCompute",
+    "Microsoft.GuestConfiguration",
+    "Microsoft.HybridConnectivity",
+    "Microsoft.AzureArcData"
 )
 foreach($provider in $requiredProviders) {
     $state = (Get-AzResourceProvider -ProviderNamespace $provider -ErrorAction SilentlyContinue | Select-Object -First 1).RegistrationState
@@ -68,7 +72,7 @@ $adminUsername = "DemoUser"
 $adminPassword = New-MhhStablePassword -Purpose 'vm-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
 $sqlMiAdminUsername = "DemoUser"
 $sqlMiAdminPassword = New-MhhStablePassword -Purpose 'sqlmi-admin' -SubscriptionId $SubscriptionId -ResourceGroupName "Default"
-$arcSQLName = "arcSQL2022"
+$modernSQLName = "modernSQL2022"
 $sharedDatabases = @("LocalMasterDataDB.bak", "SharedMasterDataDB.bak", "TenantDataDB.bak", "GlobalDataDB.bak", "TenantCRM.bak")
 $backupContainerName = "backups"
 
@@ -78,14 +82,17 @@ function Invoke-SharedVmScript {
     param(
         [Parameter(Mandatory)][string]$VmName,
         [Parameter(Mandatory)][string]$ScriptPath,
-        [Parameter(Mandatory)][hashtable]$Parameter
+        [hashtable]$Parameter = @{}
     )
+
+    $runCommandParameters = @{}
+    if ($Parameter.Count -gt 0) { $runCommandParameters.Parameter = $Parameter }
 
     $maxAttempts = 5
     for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
         try {
             Write-Host "Running $(Split-Path -Leaf $ScriptPath) on $VmName (attempt $attempt/$maxAttempts)..."
-            $runResult = Invoke-AzVMRunCommand -ResourceGroupName $sharedResourceGroup -VMName $VmName -CommandId 'RunPowerShellScript' -ScriptPath $ScriptPath -Parameter $Parameter -ErrorAction Stop
+            $runResult = Invoke-AzVMRunCommand -ResourceGroupName $sharedResourceGroup -VMName $VmName -CommandId 'RunPowerShellScript' -ScriptPath $ScriptPath @runCommandParameters -ErrorAction Stop
             $output = ($runResult.Value | ForEach-Object { $_.Message }) -join [Environment]::NewLine
             Write-Host $output
             if ($output -notmatch 'SCRIPT_RESULT=Success') {
@@ -131,7 +138,7 @@ if ($SkipSharedDeployment) {
     $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 
     @{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'; group = 'Lab-General'}}
-    @{"HackboxCredential" = @{name = 'Arc SQL Server Name'; value = $arcSQLName; note = 'Name of new SQL Server'; group = 'Lab-General'}}
+    @{"HackboxCredential" = @{name = 'Modern SQL Server Name'; value = $modernSQLName; note = 'Name of the SQL Server 2022 VM (prepared for Azure Arc onboarding via the Azure portal)'; group = 'Lab-General'}}
 
     @{"HackboxCredential" = @{name = 'VM User Name'; value = $adminUsername; note = 'Username to connect for every VM'; group = 'Lab-Credentials'}}
     @{"HackboxCredential" = @{name = 'VM User Password'; value = $adminPassword; note = 'Password to connect to every VM'; group = 'Lab-Credentials'}}
@@ -163,7 +170,7 @@ $result = Invoke-MhhDeploymentWithRegionFallback `
         adminPassword                       = $adminPassword
         sqlMiAdminUsername                  = $sqlMiAdminUsername
         sqlMiAdminPassword                  = $sqlMiAdminPassword
-        arcSQLName                          = $arcSQLName
+        modernSQLName                       = $modernSQLName
     }
 
 Write-Host "[$SubscriptionId] Result: $($result)"
@@ -176,8 +183,8 @@ $managedInstance = Get-AzSqlInstance -ResourceGroupName $sharedResourceGroup -Er
 $managedInstanceName = $managedInstance.ManagedInstanceName
 $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 
-@{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'; group = 'Lab-General'}}
-@{"HackboxCredential" = @{name = 'Arc SQL Server Name'; value = $arcSQLName; note = 'Name of new SQL Server'; group = 'Lab-General'}}
+@{"HackboxCredential" = @{name = 'SQLMI FQDN'; value = $managedInstanceFQDN; note = 'FQDN of SQLMI'; group = 'Lab-General'}}
+@{"HackboxCredential" = @{name = 'Modern SQL Server Name'; value = $modernSQLName; note = 'Name of the SQL Server 2022 VM (prepared for Azure Arc onboarding via the Azure portal)'; group = 'Lab-General'}}
 
 @{"HackboxCredential" = @{name = 'VM User Name'; value = $adminUsername; note = 'Username to connect for every VM'; group = 'Lab-Credentials'}}
 @{"HackboxCredential" = @{name = 'VM User Password'; value = $adminPassword; note = 'Password to connect to every VM'; group = 'Lab-Credentials'}}
@@ -219,13 +226,13 @@ foreach ($backupFile in $sharedDatabases) {
 }
 Remove-Item -LiteralPath $downloadDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
-Invoke-SharedVmScript -VmName $arcSQLName -ScriptPath (Join-Path $scriptPath "scripts\Restore-MIDatabases.ps1") -Parameter @{
+Invoke-SharedVmScript -VmName $modernSQLName -ScriptPath (Join-Path $scriptPath "scripts\Restore-MIDatabases.ps1") -Parameter @{
     StorageAccountName    = $storageAccountName
     ManagedInstanceServer = $managedInstanceFQDN
     sqlusername           = $sqlMiAdminUsername
     sqlpassword           = $sqlMiAdminPassword
 }
-Invoke-SharedVmScript -VmName $arcSQLName -ScriptPath (Join-Path $scriptPath "scripts\Configure-SQLMI.ps1") -Parameter @{
+Invoke-SharedVmScript -VmName $modernSQLName -ScriptPath (Join-Path $scriptPath "scripts\Configure-SQLMI.ps1") -Parameter @{
     ManagedInstanceServer = $managedInstanceFQDN
     sqlusername           = $sqlMiAdminUsername
     sqlpassword           = $sqlMiAdminPassword
@@ -388,6 +395,24 @@ catch {
 if ($ErrorOccurred) {
     throw "Errors occurred during log settings configuration. Please check the logs for details."
 }
+
+# Make the SQL Server 2022 VM "Arc ready" so that participants can onboard it with the Azure Arc portal script
+# (https://learn.microsoft.com/azure/azure-arc/servers/plan-evaluate-on-azure-virtual-machine). This must be the last step
+# that needs the Azure VM Guest Agent (Run Command, VM extensions): afterwards the agent is disabled.
+Write-Host "Preparing $modernSQLName for Azure Arc onboarding..."
+
+# 1. Remove the SQL IaaS registration (it owns the SqlIaaSAgent extension) and all remaining VM extensions
+Remove-AzResource -ResourceGroupName $sharedResourceGroup -ResourceType 'Microsoft.SqlVirtualMachine/sqlVirtualMachines' -ResourceName $modernSQLName -Force -ErrorAction Stop | Out-Null
+foreach ($extension in @(Get-AzVMExtension -ResourceGroupName $sharedResourceGroup -VMName $modernSQLName -ErrorAction Stop)) {
+    Write-Host "Removing VM extension $($extension.Name)..."
+    Remove-AzVMExtension -ResourceGroupName $sharedResourceGroup -VMName $modernSQLName -Name $extension.Name -Force -ErrorAction Stop | Out-Null
+}
+
+# 2. Set MSFT_ARC_TEST, block IMDS and disable the guest agent inside the VM
+Invoke-SharedVmScript -VmName $modernSQLName -ScriptPath (Join-Path $scriptPath "scripts\Prepare-ArcReadyVm.ps1")
+
+# 3. Restart so that the guest agent is not running anymore (the restart is done by the platform, not by the agent)
+Restart-AzVM -ResourceGroupName $sharedResourceGroup -Name $modernSQLName -ErrorAction Stop | Out-Null
 
 $rg = Get-AzResourceGroup -Name $sharedResourceGroup -ErrorAction SilentlyContinue
 $tags = $rg.Tags

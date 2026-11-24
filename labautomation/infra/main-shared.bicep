@@ -23,9 +23,9 @@ param teamSubnetPrefix string = '10.0.3.0/24'
 param bastionSubnetPrefix string = '10.0.4.0/24'
 param PrivateEndpointsSubnetPrefix string = '10.0.5.0/24'
 
-param arcSQLName string
+param modernSQLName string
 
-param sqlarcVmSize string = 'Standard_D2s_v5'
+param modernSqlVmSize string = 'Standard_D2s_v5'
 
 param managedInstanceVCores int = 8
 param managedInstanceStorageGB int = 256
@@ -98,15 +98,15 @@ module logAnalytics 'modules/loganalytics.bicep' = {
   }
 }
 
-module sqlarcSqlVm 'modules/sql2022-vm.bicep' = {
-  name: '${arcSQLName}-vm'
+module modernSqlVm 'modules/sql2022-vm.bicep' = {
+  name: '${modernSQLName}-vm'
   scope: resourceGroup
   params: {
     location: location
-    vmName: arcSQLName
+    vmName: modernSQLName
     subnetId: network.outputs.managementSubnetId
     privateIPAddress: '10.0.2.6'
-    vmSize: sqlarcVmSize
+    vmSize: modernSqlVmSize
     adminUsername: adminUsername
     adminPassword: adminPassword
     sqlMiAdminUsername: sqlMiAdminUsername
@@ -155,15 +155,15 @@ module storage_rbac 'modules/storage-rbac.bicep' = {
   }
 }
 
-module sqlarcSqlVm_cse 'modules/sql2022-vm-cse.bicep' = {
-  name: 'sqlarc-sql-vm_cse'
+module modernSqlVm_cse 'modules/sql2022-vm-cse.bicep' = {
+  name: 'modern-sql-vm_cse'
   scope: resourceGroup
   dependsOn: [
-    sqlarcSqlVm
+    modernSqlVm
   ]
   params: {
     location: location
-    vmName: 'arcSQL2022'
+    vmName: modernSQLName
     adminUsername: adminUsername
     adminPassword: adminPassword
     sqlMiAdminUsername: sqlMiAdminUsername
@@ -181,6 +181,6 @@ output SQL_MI_NAME string = managedInstance.outputs.managedInstanceName
 
 output SQL_MI_FQDN string = managedInstance.outputs.fullyQualifiedDomainName
 
-output ARC_SQL_VM_NAME string = sqlarcSqlVm.outputs.vmName
+output MODERN_SQL_VM_NAME string = modernSqlVm.outputs.vmName
 
 output BASTION_NAME string = bastion.outputs.bastionName
