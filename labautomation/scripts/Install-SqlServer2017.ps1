@@ -77,29 +77,42 @@ try
             Write-Host "Could not add Microsoft Defender exclusions: $($_.Exception.Message)"
         }
 
-        if ([string]::IsNullOrWhiteSpace($IsoPath))
-        {
-            $IsoPath = Join-Path $InstallDirectory ([System.IO.Path]::GetFileName($IsoUri))
-
-            Write-Host "Downloading SQL Server 2017 Developer media from $IsoUri."
-            & curl.exe --location --fail --silent --show-error --retry 5 --retry-delay 10 --output $IsoPath $IsoUri
-
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $IsoPath))
-            {
-                throw "Download of the SQL Server media failed (curl exit code $LASTEXITCODE)."
-            }
-        }
-
         $updateDirectory = Join-Path $InstallDirectory 'CU'
         New-Item -ItemType Directory -Path $updateDirectory -Force | Out-Null
 
         $updateFile = Join-Path $updateDirectory ([System.IO.Path]::GetFileName($CumulativeUpdateUri))
-        Write-Host "Downloading cumulative update $([System.IO.Path]::GetFileName($CumulativeUpdateUri))."
-        & curl.exe --location --fail --silent --show-error --retry 5 --retry-delay 10 --output $updateFile $CumulativeUpdateUri
 
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $updateFile))
+        # The media and the cumulative update are downloaded in parallel
+        $downloads = @(
+            @{ Name = 'cumulative update'; Uri = $CumulativeUpdateUri; Path = $updateFile }
+        )
+
+        if ([string]::IsNullOrWhiteSpace($IsoPath))
         {
-            throw "Download of the cumulative update failed (curl exit code $LASTEXITCODE)."
+            $IsoPath = Join-Path $InstallDirectory ([System.IO.Path]::GetFileName($IsoUri))
+            $downloads += @{ Name = 'SQL Server media'; Uri = $IsoUri; Path = $IsoPath }
+        }
+
+        foreach ($download in $downloads)
+        {
+            Write-Host "Downloading $($download.Name) from $($download.Uri)."
+            $download.ErrorLog = "$($download.Path).err"
+            $download.Process = Start-Process -FilePath 'curl.exe' -WindowStyle Hidden -PassThru `
+                -RedirectStandardError $download.ErrorLog `
+                -ArgumentList @('--location', '--fail', '--silent', '--show-error', '--retry', '5', '--retry-delay', '10', '--output', "`"$($download.Path)`"", "`"$($download.Uri)`"")
+            $null = $download.Process.Handle   # keeps the handle so that ExitCode is available
+        }
+
+        foreach ($download in $downloads)
+        {
+            $download.Process.WaitForExit()
+
+            if ($download.Process.ExitCode -ne 0 -or -not (Test-Path $download.Path))
+            {
+                throw "Download of the $($download.Name) failed (curl exit code $($download.Process.ExitCode)): $(Get-Content -Path $download.ErrorLog -Raw -ErrorAction SilentlyContinue)"
+            }
+
+            Write-Host "Downloaded the $($download.Name)."
         }
 
         Write-Host "Mounting $IsoPath."

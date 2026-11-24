@@ -71,7 +71,7 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
         createOption: 'FromImage'
 
         managedDisk: {
-          storageAccountType: 'StandardSSD_LRS'
+          storageAccountType: 'Premium_LRS'
         }
       }
     }
