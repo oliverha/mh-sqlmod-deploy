@@ -172,6 +172,17 @@ function Get-ManagedInstanceVCoreQuotaLeft {
     [double]$usage.properties.limit - [double]$usage.properties.currentValue
 }
 
+function Get-ProviderResourceTypeLocations {
+    param([string]$SubscriptionId, [string]$Namespace, [string]$ResourceType)
+
+    $response = Invoke-AzRestMethod -Method GET -Path "/subscriptions/$SubscriptionId/providers/${Namespace}?api-version=2021-04-01" -ErrorAction Stop
+    if ($response.StatusCode -ne 200) { throw "HTTP $($response.StatusCode)" }
+
+    $type = ($response.Content | ConvertFrom-Json).resourceTypes | Where-Object { $_.resourceType -eq $ResourceType } | Select-Object -First 1
+    if (-not $type) { throw "resource type $Namespace/$ResourceType not found" }
+    @($type.locations | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() })
+}
+
 function Start-ManagedInstanceWatchdog {
     param(
         [string]$SubscriptionId,
@@ -242,9 +253,18 @@ function Start-ManagedInstanceWatchdog {
 $vCoresMatch = Select-String -Path $template -Pattern '^\s*param\s+managedInstanceVCores\s+int\s*=\s*(\d+)' | Select-Object -First 1
 $requiredVCores = if ($vCoresMatch) { [int]$vCoresMatch.Matches[0].Groups[1].Value } else { 8 }
 
+# The SQL Server 2022 VM is registered with the SQL IaaS extension, which is not available in every region
+$sqlVmLocations = $null
+try { $sqlVmLocations = Get-ProviderResourceTypeLocations -SubscriptionId $SubscriptionId -Namespace 'Microsoft.SqlVirtualMachine' -ResourceType 'sqlVirtualMachines' }
+catch { Write-Host "[$SubscriptionId] Availability of Microsoft.SqlVirtualMachine could not be checked ($($_.Exception.Message))." -ForegroundColor Yellow }
+
 $usableLocations = @()
 foreach ($candidate in $PreferredLocation) {
     $apiLocation = ($candidate -replace '\s', '').ToLowerInvariant()
+    if ($sqlVmLocations -and $sqlVmLocations -notcontains $apiLocation) {
+        Write-Host "[$SubscriptionId] $candidate`: skipped, Microsoft.SqlVirtualMachine/sqlVirtualMachines is not available in this region." -ForegroundColor Yellow
+        continue
+    }
     try {
         $quotaLeft = Get-ManagedInstanceVCoreQuotaLeft -SubscriptionId $SubscriptionId -Location $apiLocation
         if ($quotaLeft -ge $requiredVCores) {
@@ -261,7 +281,7 @@ foreach ($candidate in $PreferredLocation) {
     }
 }
 if ($usableLocations.Count -eq 0) {
-    throw "None of the preferred regions ($($PreferredLocation -join ', ')) has enough SQL Managed Instance vCore quota ($requiredVCores vCores). Request quota or add another region."
+    throw "None of the preferred regions ($($PreferredLocation -join ', ')) can host the shared deployment (SQL Managed Instance vCore quota of $requiredVCores vCores and SQL IaaS extension availability). Request quota or add another region."
 }
 $PreferredLocation = $usableLocations
 
