@@ -176,7 +176,7 @@ function Get-ProviderResourceTypeLocations {
 $vCoresMatch = Select-String -Path $template -Pattern '^\s*param\s+managedInstanceVCores\s+int\s*=\s*(\d+)' | Select-Object -First 1
 $requiredVCores = if ($vCoresMatch) { [int]$vCoresMatch.Matches[0].Groups[1].Value } else { 8 }
 
-# The SQL Server 2022 VM is registered with the SQL IaaS extension, which is not available in every region
+# The SQL Server 2022 VM needs the SQL IaaS extension (the VM is registered with it first), which is not available in every region
 $sqlVmLocations = $null
 try { $sqlVmLocations = Get-ProviderResourceTypeLocations -SubscriptionId $SubscriptionId -Namespace 'Microsoft.SqlVirtualMachine' -ResourceType 'sqlVirtualMachines' }
 catch { Write-Host "[$SubscriptionId] Availability of Microsoft.SqlVirtualMachine could not be checked ($($_.Exception.Message))." -ForegroundColor Yellow }
@@ -465,6 +465,13 @@ Remove-AzResource -ResourceGroupName $sharedResourceGroup -ResourceType 'Microso
 foreach ($extension in @(Get-AzVMExtension -ResourceGroupName $sharedResourceGroup -VMName $modernSQLName -ErrorAction Stop)) {
     Write-Host "Removing VM extension $($extension.Name)..."
     Remove-AzVMExtension -ResourceGroupName $sharedResourceGroup -VMName $modernSQLName -Name $extension.Name -Force -ErrorAction Stop | Out-Null
+}
+
+# The SQL IaaS extension also projects the instances of the Azure VM as "SQL Server - Azure Arc" resources named like the VM
+# (e.g. modernSQL2022). They would collide with the instances created when the participants onboard the machine to Azure Arc.
+foreach ($arcSqlInstance in @(Get-AzResource -ResourceGroupName $sharedResourceGroup -ResourceType 'Microsoft.AzureArcData/sqlServerInstances' -ErrorAction SilentlyContinue)) {
+    Write-Host "Removing SQL Server - Azure Arc resource $($arcSqlInstance.Name)..."
+    Remove-AzResource -ResourceId $arcSqlInstance.ResourceId -Force -ErrorAction Stop | Out-Null
 }
 
 # 2. Set MSFT_ARC_TEST, block IMDS and disable the guest agent inside the VM
