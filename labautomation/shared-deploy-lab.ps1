@@ -11,10 +11,6 @@ Specifies the Azure subscription that contains the lab resources.
 Specifies the preferred Azure regions (ordered by preference) for resource deployment.
 .PARAMETER AllowedEntraUserIds
 Entra user object IDs of every participant holding a lab in this subscription.
-.PARAMETER ManagedInstanceVirtualClusterTimeoutMinutes
-Maximum time the SQL MI step "Virtual Cluster resize/creation" may run. Afterwards the running deployment is cancelled so the region fallback can continue.
-.PARAMETER ManagedInstanceTotalTimeoutMinutes
-Maximum time a single SQL MI create operation may run in total before the running deployment is cancelled.
 #>
 param(  
     [Parameter(Mandatory=$true)]
@@ -24,13 +20,7 @@ param(
     [string[]]$PreferredLocation = @(),
 
     [Parameter(Mandatory=$false)]
-    [string[]]$AllowedEntraUserIds = @(),
-
-    [Parameter(Mandatory=$false)]
-    [int]$ManagedInstanceVirtualClusterTimeoutMinutes = 30,
-
-    [Parameter(Mandatory=$false)]
-    [int]$ManagedInstanceTotalTimeoutMinutes = 120
+    [string[]]$AllowedEntraUserIds = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -159,8 +149,8 @@ if ($SkipSharedDeployment) {
 }
 
 
-# SQL MI reports a missing vCore quota only at the end of a long deployment and hangs silently when a region has no capacity.
-# Regions without quota are therefore skipped up front and a watchdog cancels a MI creation that takes too long.
+# SQL MI reports a missing vCore quota only at the end of a long deployment.
+# Regions that cannot host the deployment are therefore skipped up front.
 function Get-ManagedInstanceVCoreQuotaLeft {
     param([string]$SubscriptionId, [string]$Location)
 
@@ -181,73 +171,6 @@ function Get-ProviderResourceTypeLocations {
     $type = ($response.Content | ConvertFrom-Json).resourceTypes | Where-Object { $_.resourceType -eq $ResourceType } | Select-Object -First 1
     if (-not $type) { throw "resource type $Namespace/$ResourceType not found" }
     @($type.locations | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() })
-}
-
-function Start-ManagedInstanceWatchdog {
-    param(
-        [string]$SubscriptionId,
-        [string]$ResourceGroupName,
-        [int]$VirtualClusterTimeoutMinutes,
-        [int]$TotalTimeoutMinutes,
-        [hashtable]$State
-    )
-
-    Start-ThreadJob -ArgumentList $SubscriptionId, $ResourceGroupName, $VirtualClusterTimeoutMinutes, $TotalTimeoutMinutes, $State -ScriptBlock {
-        param($SubscriptionId, $ResourceGroupName, $VirtualClusterTimeoutMinutes, $TotalTimeoutMinutes, $State)
-
-        $basePath = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Sql/managedInstances"
-        $apiVersion = 'api-version=2023-08-01-preview'
-        $handled = @{}
-
-        while ($true) {
-            Start-Sleep -Seconds 60
-            try {
-                $list = Invoke-AzRestMethod -Method GET -Path "${basePath}?$apiVersion" -ErrorAction Stop
-                if ($list.StatusCode -ne 200) { continue }
-
-                foreach ($instance in ($list.Content | ConvertFrom-Json).value) {
-                    if ($instance.properties.state -ne 'Creating') { continue }
-
-                    $operations = Invoke-AzRestMethod -Method GET -Path "$basePath/$($instance.name)/operations?$apiVersion" -ErrorAction Stop
-                    if ($operations.StatusCode -ne 200) { continue }
-
-                    $operation = ($operations.Content | ConvertFrom-Json).value |
-                        Where-Object { $_.properties.state -eq 'InProgress' } |
-                        Sort-Object { [datetime]$_.properties.startTime } -Descending |
-                        Select-Object -First 1
-                    if (-not $operation) { continue }
-
-                    $key = "$($instance.name)|$($operation.properties.startTime)"
-                    if ($handled.ContainsKey($key)) { continue }
-
-                    $elapsedMinutes = ([datetime]::UtcNow - ([datetime]$operation.properties.startTime).ToUniversalTime()).TotalMinutes
-                    $virtualClusterStep = @($operation.properties.operationSteps.stepsList) |
-                        Where-Object { $_.name -like 'Virtual Cluster*' -and $_.status -eq 'InProgress' } |
-                        Select-Object -First 1
-
-                    $reason = $null
-                    if ($virtualClusterStep -and $elapsedMinutes -ge $VirtualClusterTimeoutMinutes) {
-                        $reason = "Managed instance '$($instance.name)' is still in 'Virtual Cluster resize/creation' after $([int]$elapsedMinutes) minutes (limit $VirtualClusterTimeoutMinutes)."
-                    }
-                    elseif ($elapsedMinutes -ge $TotalTimeoutMinutes) {
-                        $reason = "Managed instance '$($instance.name)' is still being created after $([int]$elapsedMinutes) minutes (limit $TotalTimeoutMinutes)."
-                    }
-                    if (-not $reason) { continue }
-
-                    $handled[$key] = $true
-                    $State.Reason = $reason
-                    [Console]::WriteLine("WATCHDOG: $reason Cancelling the running deployments so that the next region can be tried.")
-
-                    Get-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue |
-                        Where-Object { $_.ProvisioningState -eq 'Running' } |
-                        ForEach-Object { Stop-AzResourceGroupDeployment -ResourceGroupName $ResourceGroupName -Name $_.DeploymentName -ErrorAction SilentlyContinue | Out-Null }
-                }
-            }
-            catch {
-                [Console]::WriteLine("WATCHDOG: check failed and will be retried: $($_.Exception.Message)")
-            }
-        }
-    }
 }
 
 $vCoresMatch = Select-String -Path $template -Pattern '^\s*param\s+managedInstanceVCores\s+int\s*=\s*(\d+)' | Select-Object -First 1
@@ -291,34 +214,23 @@ $tags = @{
     SecurityControl = "Ignore"
 }
 
-$watchdogState = [hashtable]::Synchronized(@{ Reason = $null })
-$watchdog = Start-ManagedInstanceWatchdog -SubscriptionId $SubscriptionId -ResourceGroupName $sharedResourceGroup `
-    -VirtualClusterTimeoutMinutes $ManagedInstanceVirtualClusterTimeoutMinutes -TotalTimeoutMinutes $ManagedInstanceTotalTimeoutMinutes -State $watchdogState
-
 Write-Host "Calling Invoke-MhhDeploymentWithRegionFallback ..."
-try {
-    $result = Invoke-MhhDeploymentWithRegionFallback `
-        -PreferredLocations      $PreferredLocation `
-        -RgOwnerEntraObjectIds   @($AllowedEntraUserIds) `
-        -ResourceGroupName       $sharedResourceGroup `
-        -CleanupTimeoutSeconds   1800 `
-        -TemplateFile            $template `
-        -Tag                     $tags `
-        -TemplateParameterObject @{
-            environmentName                     = $environmentName  # z.B. "sqlhack"
-            location                            = $PreferredLocation[0]
-            adminUsername                       = $adminUsername
-            adminPassword                       = $adminPassword
-            sqlMiAdminUsername                  = $sqlMiAdminUsername
-            sqlMiAdminPassword                  = $sqlMiAdminPassword
-            modernSQLName                       = $modernSQLName
-        }
-}
-finally {
-    Stop-Job -Job $watchdog -ErrorAction SilentlyContinue
-    Remove-Job -Job $watchdog -Force -ErrorAction SilentlyContinue
-    if ($watchdogState.Reason) { Write-Host "[$SubscriptionId] Watchdog: $($watchdogState.Reason)" -ForegroundColor Yellow }
-}
+$result = Invoke-MhhDeploymentWithRegionFallback `
+    -PreferredLocations      $PreferredLocation `
+    -RgOwnerEntraObjectIds   @($AllowedEntraUserIds) `
+    -ResourceGroupName       $sharedResourceGroup `
+    -CleanupTimeoutSeconds   1800 `
+    -TemplateFile            $template `
+    -Tag                     $tags `
+    -TemplateParameterObject @{
+        environmentName                     = $environmentName  # z.B. "sqlhack"
+        location                            = $PreferredLocation[0]
+        adminUsername                       = $adminUsername
+        adminPassword                       = $adminPassword
+        sqlMiAdminUsername                  = $sqlMiAdminUsername
+        sqlMiAdminPassword                  = $sqlMiAdminPassword
+        modernSQLName                       = $modernSQLName
+    }
 
 Write-Host "[$SubscriptionId] Result: $($result)"
 
