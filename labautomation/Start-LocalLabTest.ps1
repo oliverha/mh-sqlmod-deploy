@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     1. Sign in to Microsoft Graph (device code) and check that the Global Administrator role is active
-    2. Sign in to Az PowerShell and Azure CLI in the MCAPS tenant
+    2. Sign in to Az PowerShell in the MCAPS tenant (and to the Azure CLI with -UseAzureCli)
     3. Select the MCAPS subscription
     4. Create the shared RG and the lab RG(s) in swedencentral
     5. Run shared-deploy-lab.ps1 (optionally followed by deploy-lab.ps1, like the platform does)
@@ -60,6 +60,9 @@ param(
 
     # Skip the separate Graph login; the shared deployment then uses a Graph token obtained via Az
     [switch]$SkipGraphLogin,
+
+    # Also sign in to the Azure CLI (device code). The scripts of this repo do not call az, so this is off by default.
+    [switch]$UseAzureCli,
 
     # Also run deploy-lab.ps1 after the shared stage succeeded
     [switch]$RunLabDeployment,
@@ -369,13 +372,15 @@ Write-Host "    Account:      $($ctx.Account.Id)"
 Write-Host "    Location:     $Location"
 
 # ---------------------------------------------------------------------------
-# 3) Azure CLI (used by az calls in the scripts)
+# 3) Azure CLI (optional, the scripts of this repo do not call az)
 # ---------------------------------------------------------------------------
-Write-Step 'Azure CLI sign-in (device code)'
-az login --tenant $TenantId --use-device-code --output none
-if ($LASTEXITCODE -ne 0) { throw 'az login failed.' }
-az account set --subscription $SubscriptionId
-if ($LASTEXITCODE -ne 0) { throw 'az account set failed.' }
+if ($UseAzureCli) {
+    Write-Step 'Azure CLI sign-in (device code)'
+    az login --tenant $TenantId --use-device-code --output none
+    if ($LASTEXITCODE -ne 0) { throw 'az login failed.' }
+    az account set --subscription $SubscriptionId
+    if ($LASTEXITCODE -ne 0) { throw 'az account set failed.' }
+}
 
 # ---------------------------------------------------------------------------
 # 4) Microsoft Graph: the login already happened in step 0
