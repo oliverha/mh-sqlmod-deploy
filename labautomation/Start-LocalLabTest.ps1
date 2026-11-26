@@ -17,11 +17,13 @@
 
     With -LabUserCount, local Entra ID test users LABUSER-0001 ... are created (UPN labuser-0001@<domain>),
     one lab RG/lab VM is deployed per test user, and a Temporary Access Pass (TAP) is created for each user
-    at the end. The TAPs are created after the deployments so that their lifetime (default 8 hours) is
-    still available for the lab. This requires an active Global Administrator role (or User Administrator +
+    right after the users (before the deployments, so that no second Graph sign-in is needed). The lifetime
+    (default 8 hours) therefore already runs during the deployments; the Expires column and the summary at the end
+    show how much of it is left. This requires an active Global Administrator role (or User Administrator +
     Authentication Administrator) and a TAP policy that allows the requested lifetime.
     With -CheckTapPolicyOnly the script only checks whether TAPs with the requested lifetime are allowed
     (nothing is created or deployed).
+    At the end (also after an error) a summary shows how long every step took.
 
 .NOTES
     Run it from the labautomation folder in the adminpwsh container:
@@ -102,7 +104,46 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-function Write-Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
+$script:stepTimings = [System.Collections.Generic.List[object]]::new()
+$script:currentStep = $null
+$script:scriptStart = Get-Date
+
+function Format-Duration([timespan]$Duration) {
+    '{0}:{1:00}:{2:00}' -f [int][math]::Floor($Duration.TotalHours), $Duration.Minutes, $Duration.Seconds
+}
+
+# Closes the running step and records how long it took
+function Complete-Step {
+    if ($script:currentStep) {
+        $duration = (Get-Date) - $script:currentStep.Start
+        $script:stepTimings.Add([pscustomobject]@{ Step = $script:currentStep.Name; Duration = $duration })
+        Write-Host "    ($(Format-Duration $duration))" -ForegroundColor DarkGray
+        $script:currentStep = $null
+    }
+}
+
+function Write-Step([string]$Text) {
+    Complete-Step
+    Write-Host "`n==> $Text" -ForegroundColor Cyan
+    $script:currentStep = @{ Name = $Text; Start = Get-Date }
+}
+
+function Show-Timings {
+    Complete-Step
+    if ($script:timingsShown -or $script:stepTimings.Count -eq 0) { return }
+    $script:timingsShown = $true
+    Write-Host "`nTimings (h:mm:ss):" -ForegroundColor Cyan
+    foreach ($timing in $script:stepTimings) {
+        Write-Host ('    {0}  {1}' -f (Format-Duration $timing.Duration), $timing.Step)
+    }
+    Write-Host ('    {0}  Total' -f (Format-Duration ((Get-Date) - $script:scriptStart))) -ForegroundColor Green
+}
+
+# Show the timings also if a step fails
+trap {
+    Show-Timings
+    break
+}
 
 function Connect-LocalGraph {
     param([string[]]$Scopes)
@@ -387,6 +428,7 @@ if ($UseAzureCli) {
 # 4b) Optional: create the local Entra ID test users LABUSER-0001 ...
 # ---------------------------------------------------------------------------
 $labUsers = @()
+$taps = @()
 if ($LabUserCount -gt 0) {
     Write-Step 'Checking the TAP policy'
     if (-not (Test-TapPolicy)) {
@@ -401,6 +443,16 @@ if ($LabUserCount -gt 0) {
     Write-Host "    Domain: $UserDomain"
     $labUsers = @($FirstLabUserNumber..($FirstLabUserNumber + $LabUserCount - 1) |
         ForEach-Object { Confirm-LocalLabUser -Number $_ -Domain $UserDomain })
+
+    # The TAPs are created right away, because the Graph session of this script is replaced by the shared deployment
+    Write-Step "Creating Temporary Access Passes ($TapLifetimeMinutes minutes) for $($labUsers.Count) test users"
+    $taps = @($labUsers | ForEach-Object { New-LocalLabTap -User $_ })
+    $taps | Format-Table User, Team, TAP, Expires -AutoSize | Out-Host
+
+    if ($TapOutputFile) {
+        $taps | Export-Csv -Path $TapOutputFile -NoTypeInformation -Encoding UTF8
+        Write-Host "    TAPs saved to '$TapOutputFile' (contains secrets, do not check in)." -ForegroundColor Yellow
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -471,6 +523,7 @@ if ($RunLabDeployment) {
 
         $labResults = $labTargets | ForEach-Object -ThrottleLimit $ThrottleLimit -Parallel {
             $target = $_
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
             try {
                 foreach ($modulePath in $using:mhhModulePaths) { Import-Module $modulePath -ErrorAction Stop }
                 foreach ($function in $using:mhhFunctions) {
@@ -485,12 +538,12 @@ if ($RunLabDeployment) {
                     -ResourceGroupName   $target.ResourceGroupName `
                     -PreferredLocation   $using:Location `
                     -AllowedEntraUserIds $target.UserId
-                Write-Host "    [$($target.ResourceGroupName)] deployment finished."
-                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $true; Output = $output; Error = $null }
+                Write-Host ("    [{0}] deployment finished after {1}:{2:00}." -f $target.ResourceGroupName, [math]::Floor($stopwatch.Elapsed.TotalMinutes), $stopwatch.Elapsed.Seconds)
+                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $true; Output = $output; Error = $null; Duration = $stopwatch.Elapsed }
             }
             catch {
-                Write-Host "    [$($target.ResourceGroupName)] deployment FAILED: $($_.Exception.Message)"
-                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $false; Output = $null; Error = $_.Exception.Message }
+                Write-Host ("    [{0}] deployment FAILED after {1}:{2:00}: {3}" -f $target.ResourceGroupName, [math]::Floor($stopwatch.Elapsed.TotalMinutes), $stopwatch.Elapsed.Seconds, $_.Exception.Message)
+                [pscustomobject]@{ ResourceGroupName = $target.ResourceGroupName; Success = $false; Output = $null; Error = $_.Exception.Message; Duration = $stopwatch.Elapsed }
             }
         }
 
@@ -501,6 +554,15 @@ if ($RunLabDeployment) {
             else {
                 $labFailures += "$($labResult.ResourceGroupName): $($labResult.Error)"
             }
+        }
+
+        $labDurations = @($labResults | ForEach-Object { $_.Duration.TotalSeconds })
+        if ($labDurations.Count -gt 0) {
+            $labStats = $labDurations | Measure-Object -Minimum -Maximum -Average
+            Write-Host ("    Duration per lab VM: min {0}, average {1}, max {2} (h:mm:ss)" -f `
+                (Format-Duration ([timespan]::FromSeconds($labStats.Minimum))),
+                (Format-Duration ([timespan]::FromSeconds($labStats.Average))),
+                (Format-Duration ([timespan]::FromSeconds($labStats.Maximum))))
         }
     }
     else {
@@ -528,27 +590,24 @@ else {
 }
 
 # ---------------------------------------------------------------------------
-# 8) TAPs for the test users (created only now so that the lifetime starts after the deployment)
+# 8) Summary of the TAPs (created in step 4b) and the timings
 # ---------------------------------------------------------------------------
-if ($labUsers.Count -gt 0) {
-    # The shared deployment replaces the Graph session with an Az token (without the required scopes), and the token has expired after the deployments
-    $graphContext = Get-MgContext
-    if (-not $graphContext -or $graphContext.AuthType -eq 'UserProvidedAccessToken' -or $graphContext.Scopes -notcontains 'UserAuthenticationMethod.ReadWrite.All') {
-        Write-Step 'Microsoft Graph sign-in for the TAPs (device code)'
-        Connect-LocalGraph -Scopes (Get-GraphScopes)
-    }
-
-    Write-Step "Creating Temporary Access Passes ($TapLifetimeMinutes minutes) for $($labUsers.Count) test users"
-    $taps = @($labUsers | ForEach-Object { New-LocalLabTap -User $_ })
-
+if ($taps.Count -gt 0) {
+    Complete-Step
     Write-Host "`n    Temporary Access Passes (valid until the Expires column):" -ForegroundColor Green
     $taps | Format-Table User, Team, TAP, Expires -AutoSize | Out-Host
 
-    if ($TapOutputFile) {
-        $taps | Export-Csv -Path $TapOutputFile -NoTypeInformation -Encoding UTF8
-        Write-Host "    TAPs saved to '$TapOutputFile' (contains secrets, do not check in)." -ForegroundColor Yellow
+    $firstExpiry = ($taps | ForEach-Object { [datetime]$_.Expires } | Sort-Object | Select-Object -First 1)
+    $remaining = $firstExpiry - (Get-Date)
+    if ($remaining.TotalMinutes -gt 0) {
+        Write-Host "    The TAPs are still valid for $(Format-Duration $remaining)." -ForegroundColor Green
+    }
+    else {
+        Write-Warning "The TAPs have expired. Create new ones by running the script again."
     }
 }
+
+Show-Timings
 
 if ($labFailures.Count -gt 0) {
     throw "$($labFailures.Count) lab deployment(s) failed, see the messages above."
