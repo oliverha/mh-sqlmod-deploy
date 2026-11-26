@@ -59,7 +59,7 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2024-11-01' = {
       imageReference: {
         publisher: 'MicrosoftSQLServer'
         offer: 'SQL2022-WS2022'
-        sku: 'sqldev-gen2'
+        sku: 'enterprise-gen2'
         version: 'latest'
       }
 

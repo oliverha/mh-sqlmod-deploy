@@ -51,7 +51,7 @@ Write-Host "Configuring Team Databases..."
 Write-Host "Configuring SQL MI Sysadmins..."
 & .\Configure-SQLMI-Sysadmins.ps1 -ManagedInstanceServer $ManagedInstanceServer -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword -sqlMiSysadminUser $SqlMiSysadminUser
 
-Write-Host "Installing Team Tools..."
+Write-Host "Starting the installation of the team tools (SSMS, Storage Explorer) in the background..."
 & .\install-team-tools.ps1
 
 Write-Host "Downloading Sample Files..."

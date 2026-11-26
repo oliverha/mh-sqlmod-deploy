@@ -36,6 +36,8 @@ if (Test-Path $EnvironmentInfoPath) {
 "SQL MI (Password):    Please use password provided" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 "Storage Account:      $StorageAccountName" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
+"" | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
+"SSMS 22:              is installed in the background after the deployment. The 'SSMS 22' desktop shortcut appears when it is ready." | Out-File -FilePath $EnvironmentInfoPath -Encoding utf8 -Force -Append
 
 $TargetFile = $EnvironmentInfoPath
 $ShortcutPath = "$env:Public\Desktop\Readme.lnk"
