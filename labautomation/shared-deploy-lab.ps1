@@ -25,9 +25,49 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Step timings. Only Write-Host is used here: the pipeline output of this script carries the HackboxCredential entries.
+$script:sharedTimings = [System.Collections.Generic.List[object]]::new()
+$script:sharedStep = $null
+$script:sharedStart = Get-Date
+
+function Format-SharedDuration([timespan]$Duration) {
+    '{0}:{1:00}:{2:00}' -f [int][math]::Floor($Duration.TotalHours), $Duration.Minutes, $Duration.Seconds
+}
+
+function Stop-SharedStep {
+    if ($script:sharedStep) {
+        $duration = (Get-Date) - $script:sharedStep.Start
+        $script:sharedTimings.Add([pscustomobject]@{ Step = $script:sharedStep.Name; Duration = $duration })
+        Write-Host "[Timing] $($script:sharedStep.Name) took $(Format-SharedDuration $duration)"
+        $script:sharedStep = $null
+    }
+}
+
+function Start-SharedStep([string]$Name) {
+    Stop-SharedStep
+    $script:sharedStep = @{ Name = $Name; Start = Get-Date }
+}
+
+function Write-SharedTimings {
+    Stop-SharedStep
+    if ($script:sharedTimings.Count -eq 0) { return }
+    Write-Host "[Timing] Summary of shared-deploy-lab.ps1 (h:mm:ss):"
+    foreach ($timing in $script:sharedTimings) {
+        Write-Host ('[Timing]   {0}  {1}' -f (Format-SharedDuration $timing.Duration), $timing.Step)
+    }
+    Write-Host ('[Timing]   {0}  Total' -f (Format-SharedDuration ((Get-Date) - $script:sharedStart)))
+}
+
+# Show the timings also if a step fails
+trap {
+    Write-SharedTimings
+    break
+}
+
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Write-Host "[$SubscriptionId] Running shared-deploy-lab.ps1 in $scriptPath"
 
+Start-SharedStep 'Register resource providers'
 # EXAMPLE: Register Resource Providers here if needed
 $requiredProviders = @(
     "Microsoft.Compute",
@@ -173,6 +213,7 @@ function Get-ProviderResourceTypeLocations {
     @($type.locations | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() })
 }
 
+Start-SharedStep 'Preflight (region checks, quota)'
 $vCoresMatch = Select-String -Path $template -Pattern '^\s*param\s+managedInstanceVCores\s+int\s*=\s*(\d+)' | Select-Object -First 1
 $requiredVCores = if ($vCoresMatch) { [int]$vCoresMatch.Matches[0].Groups[1].Value } else { 8 }
 
@@ -215,6 +256,7 @@ $tags = @{
 }
 
 Write-Host "Calling Invoke-MhhDeploymentWithRegionFallback ..."
+Start-SharedStep 'Shared infrastructure deployment (Invoke-MhhDeploymentWithRegionFallback)'
 $result = Invoke-MhhDeploymentWithRegionFallback `
     -PreferredLocations      $PreferredLocation `
     -RgOwnerEntraObjectIds   @($AllowedEntraUserIds) `
@@ -251,6 +293,7 @@ $managedInstanceFQDN = $managedInstance.FullyQualifiedDomainName
 @{"HackboxCredential" = @{name = 'SQLMI User Password'; value = $sqlMiAdminPassword; note = 'Password to connect to SQLMI'; group = 'Lab-Credentials'}}
 
 #Restore the shared databases and configure the SQLMI (the SQL Server 2016 legacy VM is replaced by SQL Server 2017 on every team VM)
+Start-SharedStep 'Upload database backups to the storage account'
 Write-Host "Uploading database backups to the storage account..."
 $storageAccountName = (Get-AzStorageAccount -ResourceGroupName $sharedResourceGroup -ErrorAction Stop | Select-Object -First 1).StorageAccountName
 $storageKey = (Get-AzStorageAccountKey -ResourceGroupName $sharedResourceGroup -Name $storageAccountName -ErrorAction Stop)[0].Value
@@ -285,18 +328,21 @@ foreach ($backupFile in $sharedDatabases) {
 }
 Remove-Item -LiteralPath $downloadDirectory -Recurse -Force -ErrorAction SilentlyContinue
 
+Start-SharedStep 'Restore the databases on the managed instance'
 Invoke-SharedVmScript -VmName $modernSQLName -ScriptPath (Join-Path $scriptPath "scripts\Restore-MIDatabases.ps1") -Parameter @{
     StorageAccountName    = $storageAccountName
     ManagedInstanceServer = $managedInstanceFQDN
     sqlusername           = $sqlMiAdminUsername
     sqlpassword           = $sqlMiAdminPassword
 }
+Start-SharedStep 'Configure the managed instance (Configure-SQLMI.ps1)'
 Invoke-SharedVmScript -VmName $modernSQLName -ScriptPath (Join-Path $scriptPath "scripts\Configure-SQLMI.ps1") -Parameter @{
     ManagedInstanceServer = $managedInstanceFQDN
     sqlusername           = $sqlMiAdminUsername
     sqlpassword           = $sqlMiAdminPassword
 }
 
+Start-SharedStep 'Directory Readers for the managed identity of the MI'
 [string]$managedInstanceResourceId = $managedInstance.Id
 #$managedInstancePrincipalId = $managedInstance.Identity.PrincipalId
 
@@ -315,6 +361,7 @@ catch {
     Write-Error "ERR: $ErrorString"
 }
 
+Start-SharedStep 'Entra ID admin on the managed instance'
 Start-Sleep -Seconds 30
 
 try {
@@ -387,6 +434,11 @@ if (-not $found)
     throw "Expected Entra ID Admin was not configured within 2 minutes."
 }
 
+Start-SharedStep 'Diagnostic settings (Log Analytics)'
+# Az.Monitor announces that the -Log/-Metric parameters of New-AzDiagnosticSetting change from arrays to lists. Our arrays
+# are converted to either type automatically, so the code needs no change; only the announcement is silenced for this block.
+$previousBreakingChangeWarnings = $env:SuppressAzurePowerShellBreakingChangeWarnings
+$env:SuppressAzurePowerShellBreakingChangeWarnings = 'true'
 #Configure Log Settings for SQLMI
 $ErrorOccurred = $false
 try {
@@ -451,12 +503,16 @@ catch {
     Write-Error "ERR: $ErrorString"
     $ErrorOccurred = $true
 }
+finally {
+    $env:SuppressAzurePowerShellBreakingChangeWarnings = $previousBreakingChangeWarnings
+}
 if ($ErrorOccurred) {
     throw "Errors occurred during log settings configuration. Please check the logs for details."
 }
 
 # Make the SQL Server 2022 VM "Arc ready" so that participants can onboard it with the Azure Arc portal script.
 # This is optional and runs separately: remove this call and run tools\Initialize-ArcReadyVm.ps1 by hand later instead.
+Start-SharedStep 'Prepare the SQL Server 2022 VM for Azure Arc'
 Write-Host "Preparing $modernSQLName for Azure Arc onboarding..."
 & (Join-Path $scriptPath "tools\Initialize-ArcReadyVm.ps1") -SubscriptionId $SubscriptionId -SharedResourceGroupName $sharedResourceGroup -VmName $modernSQLName | Out-Null
 
@@ -464,3 +520,5 @@ $rg = Get-AzResourceGroup -Name $sharedResourceGroup -ErrorAction SilentlyContin
 $tags = $rg.Tags
 $tags["microhack-shared-deployment"] = "Succeeded"
 Set-AzResourceGroup -Name $sharedResourceGroup -Tags $tags | Out-Null
+
+Write-SharedTimings
