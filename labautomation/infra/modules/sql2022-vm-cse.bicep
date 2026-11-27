@@ -37,6 +37,7 @@ resource ConfigureSQLMachine 'Microsoft.Compute/virtualMachines/extensions@2024-
     settings: {
       fileUris: [
         '${repoBaseURL}/scripts/Set-FW-ForAllInstances.ps1'
+        '${repoBaseURL}/scripts/Configure-EdgeFirstRun.ps1'
         '${repoBaseURL}/scripts/Restore-SampleDatabases.ps1'
         '${repoBaseURL}/scripts/bootstrap-newsql.ps1'
       ]

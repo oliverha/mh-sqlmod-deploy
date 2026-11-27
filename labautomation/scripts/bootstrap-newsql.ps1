@@ -43,6 +43,8 @@ function Write-Timings {
 }
 
 try {
+    Invoke-Step "Disable the Edge first-run prompts" { & .\Configure-EdgeFirstRun.ps1 }
+
     Invoke-Step "Configure SQL Firewall" { & .\Set-FW-ForAllInstances.ps1 }
 
     Invoke-Step "Restore Sample Database" { & .\Restore-SampleDatabases.ps1 -BackupUri $BackupUri -sqlusername $sqlMiAdminUsername -sqlpassword $sqlMiAdminPassword }

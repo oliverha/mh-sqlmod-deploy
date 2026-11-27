@@ -23,6 +23,8 @@
     Authentication Administrator) and a TAP policy that allows the requested lifetime.
     With -CheckTapPolicyOnly the script only checks whether TAPs with the requested lifetime are allowed
     (nothing is created or deployed).
+    With -NewTapsOnly (and -LabUserCount / -FirstLabUserNumber) the script only creates new TAPs for the existing
+    test users, e.g. after the old ones expired.
     At the end (also after an error) a summary shows how long every step took.
 
 .NOTES
@@ -38,6 +40,7 @@
         ./Start-LocalLabTest.ps1 -TenantId <id> -RunLabDeployment                 # shared stage + lab VM
         ./Start-LocalLabTest.ps1 -TenantId <id> -SubscriptionId <sub-id>          # use a specific subscription
         ./Start-LocalLabTest.ps1 -TenantId <id> -CheckTapPolicyOnly               # am I allowed to create 8h TAPs?
+        ./Start-LocalLabTest.ps1 -TenantId <id> -LabUserCount 2 -NewTapsOnly      # new TAPs for LABUSER-0001..0002 only
         ./Start-LocalLabTest.ps1 -TenantId <id> -LabUserCount 3 -RunLabDeployment # LABUSER-0001..0003 + 3 lab VMs + TAPs
 #>
 [CmdletBinding()]
@@ -90,6 +93,9 @@ param(
     # Only sign in to Graph and check the TAP policy; nothing is created or deployed
     [switch]$CheckTapPolicyOnly,
 
+    # Only sign in to Graph and create new TAPs for the existing test users (-LabUserCount, -FirstLabUserNumber), e.g. after
+    # the old ones expired; nothing else is created or deployed
+    [switch]$NewTapsOnly,
     # Skip the check that the Global Administrator role is active (e.g. if another sufficient role is used)
     [switch]$SkipGlobalAdminCheck,
 
@@ -160,6 +166,7 @@ function Connect-LocalGraph {
 function Get-GraphScopes {
     $policyScope = if ($UpdateTapPolicy) { 'Policy.ReadWrite.AuthenticationMethod' } else { 'Policy.Read.All' }
     if ($CheckTapPolicyOnly) { return @($policyScope, 'RoleManagement.Read.Directory') }
+    if ($NewTapsOnly) { return @('User.Read.All', 'UserAuthenticationMethod.ReadWrite.All', 'Domain.Read.All', $policyScope, 'RoleManagement.Read.Directory') }
 
     $scopes = @('Application.Read.All', 'RoleManagement.ReadWrite.Directory')
     if ($LabUserCount -gt 0) {
@@ -343,6 +350,11 @@ if ($LabUserCount -gt 0 -and $SkipGraphLogin) {
 if ($CheckTapPolicyOnly -and $SkipGraphLogin) {
     throw '-CheckTapPolicyOnly requires the Graph login, -SkipGraphLogin cannot be used.'
 }
+if ($NewTapsOnly) {
+    if ($SkipGraphLogin) { throw '-NewTapsOnly requires the Graph login, -SkipGraphLogin cannot be used.' }
+    if ($LabUserCount -lt 1) { throw '-NewTapsOnly requires -LabUserCount (and -FirstLabUserNumber if the numbering does not start at 1).' }
+    if ($CheckTapPolicyOnly -or $RunLabDeployment) { throw '-NewTapsOnly cannot be combined with -CheckTapPolicyOnly or -RunLabDeployment.' }
+}
 if ($LabUserCount -gt 0 -and ($FirstLabUserNumber + $LabUserCount - 1) -gt 9999) {
     throw "The test user numbers would exceed 9999 ($FirstLabUserNumber + $LabUserCount - 1)."
 }
@@ -370,6 +382,41 @@ if ($CheckTapPolicyOnly) {
     Write-Step 'Checking the TAP policy'
     $tapAllowed = Test-TapPolicy
     if (-not $tapAllowed) { Write-Warning "TAPs with a lifetime of $TapLifetimeMinutes minutes are currently not allowed." }
+    return
+}
+
+if ($NewTapsOnly) {
+    Write-Step 'Checking the TAP policy'
+    if (-not (Test-TapPolicy)) {
+        throw "TAPs with a lifetime of $TapLifetimeMinutes minutes are not allowed. Adjust the policy in the tenant or use -UpdateTapPolicy or -TapLifetimeMinutes."
+    }
+
+    Write-Step "Looking up $LabUserCount existing test users"
+    if (-not $UserDomain) {
+        $UserDomain = (Invoke-MgGraphRequest -Method GET -Uri 'https://graph.microsoft.com/v1.0/domains').value |
+            Where-Object { $_.isDefault } | Select-Object -First 1 -ExpandProperty id
+    }
+    Write-Host "    Domain: $UserDomain"
+    $existingUsers = @($FirstLabUserNumber..($FirstLabUserNumber + $LabUserCount - 1) | ForEach-Object {
+        $name = Get-LocalLabUserName $_
+        $upn = "$($name.ToLower())@$UserDomain"
+        $filter = [uri]::EscapeDataString("userPrincipalName eq '$upn'")
+        $found = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/users?`$filter=$filter&`$select=id,userPrincipalName").value)
+        if ($found.Count -eq 0) { throw "Test user $upn does not exist. Run the script with -LabUserCount first to create the users." }
+        [pscustomobject]@{ Name = $name; UserPrincipalName = $upn; Id = $found[0].id }
+    })
+
+    Write-Step "Creating Temporary Access Passes ($TapLifetimeMinutes minutes) for $($existingUsers.Count) test users"
+    $newTaps = @($existingUsers | ForEach-Object { New-LocalLabTap -User $_ })
+    Write-Host "`n    Temporary Access Passes (valid until the Expires column):" -ForegroundColor Green
+    $newTaps | Format-Table User, Team, TAP, Expires -AutoSize | Out-Host
+
+    if ($TapOutputFile) {
+        $newTaps | Export-Csv -Path $TapOutputFile -NoTypeInformation -Encoding UTF8
+        Write-Host "    TAPs saved to '$TapOutputFile' (contains secrets, do not check in)." -ForegroundColor Yellow
+    }
+
+    Show-Timings
     return
 }
 
